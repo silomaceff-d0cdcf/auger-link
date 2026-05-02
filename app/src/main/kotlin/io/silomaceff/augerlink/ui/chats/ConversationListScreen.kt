@@ -84,7 +84,7 @@ internal fun ScreenTitle(text: String) {
         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
     )
 }
 
