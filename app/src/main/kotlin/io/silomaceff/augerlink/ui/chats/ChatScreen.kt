@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -74,17 +75,17 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = contact.displayName,
                             style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "${contact.role} · " +
-                                if (contact.isOnline) "online" else "last seen recently",
+                            text = if (contact.isOnline) "· online" else "· offline",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 },
@@ -93,14 +94,14 @@ fun ChatScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },
@@ -189,6 +190,8 @@ private fun ChatComposer(
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
+        // Lift above the keyboard when IME is open — Telegram-style floating input.
+        modifier = Modifier.imePadding(),
     ) {
         Column {
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -203,7 +206,8 @@ private fun ChatComposer(
                     onValueChange = onDraftChange,
                     placeholder = { Text("Message…") },
                     modifier = Modifier.weight(1f),
-                    maxLines = 4,
+                    minLines = 1,
+                    maxLines = 6,    // grows up to 6 lines, then internal scroll
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.background,
                         unfocusedContainerColor = MaterialTheme.colorScheme.background,

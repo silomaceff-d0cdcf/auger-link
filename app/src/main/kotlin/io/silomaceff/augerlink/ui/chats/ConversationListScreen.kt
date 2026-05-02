@@ -48,15 +48,6 @@ fun ConversationListScreen(
 ) {
     val conversations = remember { MockStore.conversations.sortedByDescending { it.lastMessageAt } }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Chats") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onComposeNew,
@@ -69,6 +60,7 @@ fun ConversationListScreen(
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(padding)) {
+            item { ScreenTitle("Chats") }
             items(conversations) { conv ->
                 val contact = remember(conv.contactId) { MockStore.contactById(conv.contactId) }
                 if (contact != null) {
@@ -81,6 +73,19 @@ fun ConversationListScreen(
             }
         }
     }
+}
+
+@Composable
+internal fun ScreenTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineLarge,
+        color = MaterialTheme.colorScheme.onBackground,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+    )
 }
 
 @Composable

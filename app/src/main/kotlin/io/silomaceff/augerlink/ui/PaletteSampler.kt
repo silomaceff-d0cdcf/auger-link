@@ -115,15 +115,6 @@ fun PaletteSamplerScreen(
         PaletteMode.Day, PaletteMode.Night -> mode.displayName
     }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("AugerLink · $titleSuffix") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { /* Phase-2 stub */ },

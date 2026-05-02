@@ -42,15 +42,6 @@ fun ContactListScreen(
 ) {
     val contacts = remember { MockStore.contacts.sortedBy { it.displayName.lowercase() } }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Contacts") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddContact,
@@ -63,6 +54,7 @@ fun ContactListScreen(
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(padding)) {
+            item { io.silomaceff.augerlink.ui.chats.ScreenTitle("Contacts") }
             items(contacts) { c ->
                 ContactRow(c, onOpenContact)
                 HorizontalDivider(
