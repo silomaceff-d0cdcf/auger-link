@@ -1,0 +1,59 @@
+# AugerLink — gitignore
+# Standard Android / Kotlin / Gradle ignores
+
+# Build outputs
+/build
+/app/build
+/*/build
+.gradle/
+**/.gradle/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.project
+.settings/
+.classpath
+
+# Local env
+local.properties
+captures/
+*.keystore
+!debug.keystore
+gradle.properties.local
+
+# Native
+.cxx/
+**/cxx/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Python (Chaquopy temp)
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+hs_err_pid*
+
+# Test outputs
+**/test-results/
+**/jacoco.exec
+
+# Secrets / signing
+*.jks
+keystore.properties
+*.env
+
+# Agent infrastructure (per-checkout, not the project)
+.claude/
