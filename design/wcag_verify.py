@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""WCAG 2.1 contrast-ratio verifier for the AugerLink palette.
+"""WCAG 2.1 contrast-ratio verifier for the AugerLink palette variants.
 
-Runs the 10 foreground/background pairs from `palette.md` through the
-WCAG 2.1 relative-luminance formula, reports computed ratio + AA/AAA
-pass/fail per the use-case threshold (3:1 or 4.5:1).
+Two variants are defined:
+
+  - night-shift  (default) — harvest-warm palette pulled from the hero concept art.
+  - day-shift              — cool-mute variant for less seasonal-coded contexts.
 
 Usage:
-    python3 design/wcag_verify.py            # human-readable table
-    python3 design/wcag_verify.py --json     # machine-readable
+    python3 design/wcag_verify.py                                # night-shift, markdown
+    python3 design/wcag_verify.py --variant day-shift            # day-shift, markdown
+    python3 design/wcag_verify.py --variant day-shift --json     # machine-readable
+    python3 design/wcag_verify.py --variant day-shift --strict   # exit 1 on AA failure
 
-The 10 pairs are the load-bearing color combinations the palette commits to.
-If any combo fails AA, the palette doc says: bump the foreground value (V in
-HSV) slightly toward the brighter end — keep the hue and the warm character.
+The 10 fg/bg pairs verified per variant are the load-bearing combinations the
+palette commits to. Both variants must pass AA on all 10. Source of truth for
+the tokens is `app/src/main/kotlin/io/silomaceff/augerlink/ui/theme/Color.kt`;
+this script duplicates them locally so verification is self-contained.
 
 WCAG 2.1 contrast formula:
     L = 0.2126*R + 0.7152*G + 0.0722*B   (each component sRGB-linearized)
@@ -30,13 +34,11 @@ from dataclasses import dataclass
 
 
 def _linearize(c8: int) -> float:
-    """sRGB → linear RGB component, 8-bit input."""
     s = c8 / 255.0
     return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
 
 
 def relative_luminance(hex_color: str) -> float:
-    """Compute WCAG 2.1 relative luminance for a #RRGGBB hex string."""
     h = hex_color.lstrip("#")
     if len(h) != 6:
         raise ValueError(f"expected 6-digit hex, got {hex_color!r}")
@@ -45,7 +47,6 @@ def relative_luminance(hex_color: str) -> float:
 
 
 def contrast_ratio(fg: str, bg: str) -> float:
-    """WCAG 2.1 contrast ratio between two #RRGGBB colors."""
     l1 = relative_luminance(fg)
     l2 = relative_luminance(bg)
     lighter, darker = (l1, l2) if l1 >= l2 else (l2, l1)
@@ -58,11 +59,13 @@ class Pair:
     fg_hex: str
     bg_token: str
     bg_hex: str
-    min_ratio: float          # 3.0 (large/UI) or 4.5 (body text)
+    min_ratio: float
     use_case: str
 
 
-PAIRS: list[Pair] = [
+# Palette definitions — kept in sync with Color.kt manually (Phase 1 simplicity;
+# Phase 2 may extract a shared JSON/TOML source-of-truth).
+NIGHT_SHIFT_PAIRS: list[Pair] = [
     Pair("cream",        "#F5E6D3", "barn-dark",   "#1A1410", 4.5, "Body text on app bg"),
     Pair("cream",        "#F5E6D3", "charcoal",    "#0F0E0C", 4.5, "Text on cards/bubbles"),
     Pair("cream-muted",  "#C8B8A0", "barn-dark",   "#1A1410", 4.5, "Secondary text on app bg"),
@@ -75,8 +78,25 @@ PAIRS: list[Pair] = [
     Pair("success",      "#7FA756", "barn-dark",   "#1A1410", 3.0, "Success text/icon on app bg"),
 ]
 
+DAY_SHIFT_PAIRS: list[Pair] = [
+    Pair("linen",            "#E0DCD2", "bg-dark",        "#15181B", 4.5, "Body text on app bg"),
+    Pair("linen",            "#E0DCD2", "surface",        "#0E1114", 4.5, "Text on cards/bubbles"),
+    Pair("taupe",            "#A8A498", "bg-dark",        "#15181B", 4.5, "Secondary text on app bg"),
+    Pair("bronze",           "#9C7A52", "bg-dark",        "#15181B", 3.0, "Primary button bg vs app bg"),
+    Pair("bg-dark",          "#15181B", "bronze",         "#9C7A52", 4.5, "Button label on primary"),
+    Pair("oak-tan",          "#B5896A", "bg-dark",        "#15181B", 3.0, "Outgoing bubble vs app bg"),
+    Pair("bg-dark",          "#15181B", "oak-tan",        "#B5896A", 4.5, "Outgoing bubble text"),
+    Pair("straw-tan",        "#C4A77D", "bg-dark",        "#15181B", 3.0, "Active indicator on app bg"),
+    Pair("coral",            "#D85A4F", "bg-dark",        "#15181B", 3.0, "Error text/icon on app bg"),
+    Pair("sage",             "#86A88A", "bg-dark",        "#15181B", 3.0, "Success text/icon on app bg"),
+]
 
-# WCAG AAA thresholds: 7:1 normal, 4.5:1 large/UI
+VARIANTS = {
+    "night-shift": NIGHT_SHIFT_PAIRS,
+    "day-shift": DAY_SHIFT_PAIRS,
+}
+
+
 def aaa_min(min_aa: float) -> float:
     return 7.0 if min_aa == 4.5 else 4.5
 
@@ -118,18 +138,20 @@ def render_table(results: list[dict]) -> str:
 
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    p.add_argument("--variant", choices=list(VARIANTS), default="night-shift")
     p.add_argument("--json", action="store_true", help="emit JSON instead of markdown table")
     p.add_argument("--strict", action="store_true", help="exit 1 if any pair fails AA")
     args = p.parse_args(argv)
 
-    results = [evaluate(pair) for pair in PAIRS]
+    pairs = VARIANTS[args.variant]
+    results = [evaluate(pair) for pair in pairs]
+
     if args.json:
-        print(json.dumps(results, indent=2))
+        print(json.dumps({"variant": args.variant, "results": results}, indent=2))
     else:
-        print("# AugerLink Palette — WCAG 2.1 Contrast Verification\n")
-        print(f"Generated by `design/wcag_verify.py` (deterministic).\n")
+        print(f"# AugerLink Palette — WCAG 2.1 Contrast Verification ({args.variant})\n")
+        print(f"Generated by `design/wcag_verify.py --variant {args.variant}` (deterministic).\n")
         print(render_table(results))
-        print()
         n_fail = sum(1 for r in results if not r["passes_aa"])
         n_aaa = sum(1 for r in results if r["passes_aaa"])
         print(f"\n**Summary**: {len(results) - n_fail}/{len(results)} pairs pass AA; "
