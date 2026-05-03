@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.chaquopy)
 }
 
 android {
@@ -15,6 +16,13 @@ android {
         versionCode = 1
         versionName = "0.1.0-phase1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Phase 2: Chaquopy ships native CPython runtime as a per-ABI library.
+        // Restrict to arm64-v8a — the only Android ABI the project supports
+        // (matches the testbed's posture; rules out 32-bit ARM, x86, x86_64).
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -45,6 +53,16 @@ android {
         getByName("main") {
             java.srcDirs("src/main/kotlin")
         }
+    }
+}
+
+// Phase 2: embed CPython 3.11 in the APK. No pip deps yet — this commit just
+// wires up the runtime so the build still produces a runnable APK with the
+// native chaquopy library shipped per arm64-v8a. Code that exercises this
+// arrives in subsequent microcommits.
+chaquopy {
+    defaultConfig {
+        version = "3.11"
     }
 }
 
