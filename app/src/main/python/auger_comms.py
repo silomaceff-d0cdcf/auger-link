@@ -129,8 +129,8 @@ def _install_autointerface_patch() -> None:
     def _patched(self, ifname):
         # First try RNS's own netinfo helper. On many Android builds this
         # returns the right index, but for some interfaces (including
-        # wlan0 in some states) bionic's getifaddrs() reports None — see
-        # the per-interface drop discussion in the testbed's probe notes.
+        # wlan0 in some states) bionic's getifaddrs() reports None and the
+        # helper drops them. The Java fallback below catches that case.
         idx = self.netinfo.interface_names_to_indexes().get(ifname)
         if idx is not None:
             return int(idx)
