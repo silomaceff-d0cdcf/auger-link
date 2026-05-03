@@ -35,7 +35,7 @@ Color palette extracted from the concept art is in [`design/palette.md`](design/
 
 ## License
 
-[Apache License 2.0](LICENSE) — provisional. Permissive + explicit patent grant + upstream-compatible with Reticulum/LXMF/Sideband (all MIT). Revisit conditions and decision rationale in [`LICENSE.notes.md`](LICENSE.notes.md) — input from Don Blair / Dorn Cox / Farm Hack alliance still welcome and may move us toward copyleft (GPL-3.0) if the movement-aligned posture matters more than ecosystem permissiveness.
+[Apache License 2.0](LICENSE) — provisional. Permissive + explicit patent grant + upstream-compatible with Reticulum/LXMF/Sideband (all MIT). Revisit conditions and decision rationale in [`LICENSE.notes.md`](LICENSE.notes.md) — input from the Farm Hack alliance still welcome and may move us toward copyleft (GPL-3.0) if the movement-aligned posture matters more than ecosystem permissiveness.
 
 Copyright 2026 Craig Versek and AugerLink contributors.
 

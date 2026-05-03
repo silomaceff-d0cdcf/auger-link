@@ -2,7 +2,7 @@
 
 **Choice**: Apache License 2.0
 **Decided**: 2026-05-02 (Cycle 7, Phase 1 of MISSION #94)
-**Status**: Provisional — revisit after Don/Dorn (Farm Hack network) input
+**Status**: Provisional — revisit after Farm Hack network input
 
 ## Why Apache 2.0 (the safe-default balanced answer)
 
@@ -20,13 +20,13 @@
 
 - **Doesn't enforce sovereign-comms ethos in the license itself**. A BigCo could fork AugerLink, polish it, and sell as proprietary SaaS without contributing back. Apache 2.0 permits this. We're betting that the brand + community is what matters, not the legal moat.
 - **No protection against extractive forks**. If someone wants to build a closed ecosystem on top, the license allows it. Mitigation: the brand name "AugerLink" remains under our control (trademark posture, not license posture).
-- **Doesn't signal movement-aligned commitment as loudly as GPL/AGPL would**. For Farm Hack alliance audiences, Apache 2.0 reads as "open-source startup" rather than "commons-protector." If Don/Dorn read this as a values mismatch, we should revisit.
+- **Doesn't signal movement-aligned commitment as loudly as GPL/AGPL would**. For Farm Hack alliance audiences, Apache 2.0 reads as "open-source startup" rather than "commons-protector." If Farm Hack alliance contacts read this as a values mismatch, we should revisit.
 
 ## Revisit triggers
 
 We should re-open this decision if any of these occur:
 
-1. **Don or Dorn explicitly request copyleft.** Their movement-network sense of authentic commons-protection trumps our pre-input default.
+1. **Farm Hack alliance contacts explicitly request copyleft.** Their movement-network sense of authentic commons-protection trumps our pre-input default.
 2. **A first major proprietary fork emerges** that's clearly extractive (e.g., a closed agtech vendor takes AugerLink, slaps their logo on it, sells as a paid app to farmers without contributing improvements back).
 3. **Patent-troll incident.** If we get targeted, we want to verify Apache 2.0's patent clause holds up; if not, may need stronger.
 4. **Farm Hack alliance adopts a uniform license posture** for their ecosystem and we're outside it.
@@ -44,7 +44,7 @@ Apache 2.0 + dual-license to GPL: feasible at any point. This is the recommended
 
 | Date | Decision | Rationale |
 |---|---|---|
-| 2026-05-02 | Apache 2.0 provisional | Pre-Don/Dorn-input default; balanced safety with patent grant |
+| 2026-05-02 | Apache 2.0 provisional | Pre-Farm-Hack-input default; balanced safety with patent grant |
 
 (Append rows as the conversation evolves.)
 
@@ -52,5 +52,5 @@ Apache 2.0 + dual-license to GPL: feasible at any point. This is the recommended
 
 - Apache License 2.0 text: `LICENSE` (this directory)
 - Roadmap: `agent/public/roadmaps/2026-05-01_AugerLink_Sovereign_Comms_Messaging_App_curated_rebuild_from_51_testbed/roadmap.md` — Phase 1 success criteria
-- Idea bank: `agent/public/ideas/001_*.json` — referenced "Don/Dorn input pending" for license decision
+- Idea bank: `agent/public/ideas/001_*.json` — referenced "Farm Hack input pending" for license decision
 - MISSION task: #94 (parent of #95 Phase 1)
