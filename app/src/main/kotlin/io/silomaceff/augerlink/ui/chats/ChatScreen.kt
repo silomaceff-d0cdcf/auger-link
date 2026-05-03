@@ -31,12 +31,15 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -64,9 +67,35 @@ fun ChatScreen(
     }
     val mockMessages = remember(conversationId) { MockStore.messagesFor(conversationId) }
     val pendingMessages = remember(conversationId) { mutableStateListOf<Message>() }
-    val displayedMessages = mockMessages + pendingMessages
+    val receivedMessages = remember(conversationId) { mutableStateListOf<Message>() }
+    val displayedMessages = mockMessages + pendingMessages + receivedMessages
     var draft by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+
+    // Phase 4 step 3d: subscribe to LXMF inbound messages for this contact.
+    // Match by source_hash → contact.destinationHash. Mock contacts have
+    // placeholder hashes so they will never match real LXMF traffic; only
+    // real (Phase 4+) contacts will receive anything here.
+    val contactHash = contact?.destinationHash?.lowercase()
+    LaunchedEffect(contactHash) {
+        if (contactHash != null) {
+            AugerCommsRouter.incomingMessages
+                .filter { it.sourceHashHex.lowercase() == contactHash }
+                .collect { incoming ->
+                    val msg = Message(
+                        id = "in-${System.currentTimeMillis()}-${receivedMessages.size}",
+                        conversationId = conversationId,
+                        direction = MessageDirection.Inbound,
+                        body = incoming.content,
+                        sentAt = if (incoming.timestamp > 0)
+                            Instant.ofEpochSecond(incoming.timestamp.toLong())
+                        else Instant.now(),
+                        status = MessageStatus.Delivered,
+                    )
+                    receivedMessages.add(msg)
+                }
+        }
+    }
 
     if (conv == null || contact == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
