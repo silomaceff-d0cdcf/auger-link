@@ -85,6 +85,39 @@ object AugerCommsRouter {
     }
 
     /**
+     * Send a text LXMF message. Returns the hex hash of the queued
+     * outbound message on success.
+     *
+     * Success means LXMRouter accepted the message for delivery, NOT
+     * that the recipient has received it. Delivery is async and surfaces
+     * via the receive callback (next microcommit).
+     *
+     * If RNS doesn't yet know a path to the destination, this fails with
+     * a "path not known yet" error and the Python side fires a path
+     * request in the background. Caller should retry after a few seconds.
+     */
+    suspend fun send(
+        destinationHashHex: String,
+        content: String,
+        title: String = "",
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val py = Python.getInstance()
+        val module = py.getModule(MODULE)
+
+        val result = module.callAttr("send_message", destinationHashHex, content, title)
+        val ok = result.callAttr("get", "ok").toBoolean()
+        if (ok) {
+            val lxmHash = result.callAttr("get", "lxm_hash")?.toString().orEmpty()
+            Log.i(TAG, "send queued (len=${content.length}, lxm_hash_len=${lxmHash.length})")
+            Result.success(lxmHash)
+        } else {
+            val error = result.callAttr("get", "error").toString()
+            Log.w(TAG, "send failed: $error")
+            Result.failure(RuntimeException(error))
+        }
+    }
+
+    /**
      * Acquire a Wi-Fi MulticastLock so AutoInterface's link-local IPv6
      * peer-discovery multicast actually leaves the device. Without this,
      * Android's userspace-multicast filter drops every send with EPERM
