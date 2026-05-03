@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import io.silomaceff.augerlink.comms.AugerCommsRouter
 import io.silomaceff.augerlink.comms.AugerLinkService
+import io.silomaceff.augerlink.data.AugerLinkPrefs
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
@@ -38,11 +39,13 @@ class MainActivity : ComponentActivity() {
         // foreground importance and lifts the filter.
         AugerLinkService.start(this)
 
-        // Phase 2 step 3: kick off the Reticulum / LXMF init in the
-        // background. Result lands as a LogCat line tagged AugerCommsRouter
-        // (no UI surface yet — that's a later microcommit).
+        // Phase 4 step 1: read the user-configured TCP peer targets from
+        // DataStore Preferences and pass them into the router init. Empty
+        // string means "no TCP peers" (AutoInterface multicast still
+        // discovers local LAN peers on its own).
         lifecycleScope.launch {
-            AugerCommsRouter.init(this@MainActivity)
+            val tcpTargets = AugerLinkPrefs.readTcpTargets(this@MainActivity)
+            AugerCommsRouter.init(this@MainActivity, tcpTargets)
         }
 
         setContent {
