@@ -32,19 +32,24 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.silomaceff.augerlink.comms.AugerCommsRouter
 import io.silomaceff.augerlink.data.Contact
 import io.silomaceff.augerlink.data.Message
 import io.silomaceff.augerlink.data.MessageDirection
+import io.silomaceff.augerlink.data.MessageStatus
 import io.silomaceff.augerlink.data.MockStore
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
+import kotlinx.coroutines.launch
 import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,8 +62,11 @@ fun ChatScreen(
     val contact: Contact? = remember(conv?.contactId) {
         conv?.contactId?.let { MockStore.contactById(it) }
     }
-    val messages = remember(conversationId) { MockStore.messagesFor(conversationId) }
+    val mockMessages = remember(conversationId) { MockStore.messagesFor(conversationId) }
+    val pendingMessages = remember(conversationId) { mutableStateListOf<Message>() }
+    val displayedMessages = mockMessages + pendingMessages
     var draft by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     if (conv == null || contact == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -105,7 +113,34 @@ fun ChatScreen(
             ChatComposer(
                 draft = draft,
                 onDraftChange = { draft = it },
-                onSend = { draft = "" /* Phase 4: real LXMF send */ },
+                onSend = {
+                    val body = draft.trim()
+                    if (body.isNotEmpty()) {
+                        val pending = Message(
+                            id = "out-${System.currentTimeMillis()}",
+                            conversationId = conversationId,
+                            direction = MessageDirection.Outbound,
+                            body = body,
+                            sentAt = Instant.now(),
+                            status = MessageStatus.Sending,
+                        )
+                        pendingMessages.add(pending)
+                        draft = ""
+                        scope.launch {
+                            val result = AugerCommsRouter.send(
+                                destinationHashHex = contact.destinationHash,
+                                content = body,
+                            )
+                            val idx = pendingMessages.indexOfFirst { it.id == pending.id }
+                            if (idx >= 0) {
+                                pendingMessages[idx] = pending.copy(
+                                    status = if (result.isSuccess) MessageStatus.Delivered
+                                             else MessageStatus.Failed,
+                                )
+                            }
+                        }
+                    }
+                },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -119,7 +154,7 @@ fun ChatScreen(
             reverseLayout = false,
         ) {
             // Date header at top — Phase 4 will bucket by date for long histories
-            items(messages) { msg ->
+            items(displayedMessages) { msg ->
                 MessageBubble(msg)
             }
             item {
