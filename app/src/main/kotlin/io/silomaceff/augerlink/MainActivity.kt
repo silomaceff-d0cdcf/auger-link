@@ -8,10 +8,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
+import io.silomaceff.augerlink.comms.AugerCommsRouter
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
 import io.silomaceff.augerlink.ui.theme.rememberResolvedVariant
+import kotlinx.coroutines.launch
 
 /**
  * Phase 3 entry point — three-tab AugerLink shell (Chats / Contacts / Settings).
@@ -26,6 +29,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Phase 2 step 3: kick off the Reticulum / LXMF init in the
+        // background. Result lands as a LogCat line tagged AugerCommsRouter
+        // (no UI surface yet — that's a later microcommit).
+        lifecycleScope.launch {
+            AugerCommsRouter.init(this@MainActivity)
+        }
+
         setContent {
             var mode by rememberSaveable { mutableStateOf(PaletteMode.Auto) }
             val location = PaletteLocation.Default
