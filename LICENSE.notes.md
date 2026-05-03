@@ -1,7 +1,7 @@
 # LICENSE choice — provisional rationale + revisit conditions
 
 **Choice**: Apache License 2.0
-**Decided**: 2026-05-02 (Cycle 7, Phase 1 of MISSION #94)
+**Decided**: 2026-05-02 (Phase 1)
 **Status**: Provisional — revisit after Farm Hack network input
 
 ## Why Apache 2.0 (the safe-default balanced answer)
@@ -50,7 +50,5 @@ Apache 2.0 + dual-license to GPL: feasible at any point. This is the recommended
 
 ## References
 
-- Apache License 2.0 text: `LICENSE` (this directory)
-- Roadmap: `agent/public/roadmaps/2026-05-01_AugerLink_Sovereign_Comms_Messaging_App_curated_rebuild_from_51_testbed/roadmap.md` — Phase 1 success criteria
-- Idea bank: `agent/public/ideas/001_*.json` — referenced "Farm Hack input pending" for license decision
-- MISSION task: #94 (parent of #95 Phase 1)
+- Apache License 2.0 text: [`LICENSE`](LICENSE) (this directory)
+- Roadmap: [`ROADMAP.md`](ROADMAP.md) — Phase 1 success criteria + revisit cadence

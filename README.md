@@ -52,7 +52,7 @@ AugerLink was extracted from a working testbed (`chaquopy-silo-hello`) where we 
 
 **Phase 1: Repo + Branding Foundation** (in progress).
 
-7-phase MISSION roadmap is at `agent/public/roadmaps/2026-05-01_AugerLink_Sovereign_Comms_Messaging_App_curated_rebuild_from_51_testbed/roadmap.md` (in the agent's repo; will be linked here once published).
+Full 7-phase roadmap (mission, architectural decisions, phase deliverables + success criteria) is in [`ROADMAP.md`](ROADMAP.md). Phase 2 + 3 already partially complete (palette variants + auto-flip + UI shell with mock data shipped during Phase 1 iteration); Phase 4 onward is the next concrete work.
 
 ## Brand
 
@@ -90,7 +90,7 @@ The app runs on stock Android. GrapheneOS / verified-boot Android is *recommende
 
 ## Sister projects
 
-- [`chaquopy-silo-hello`](../chaquopy-silo-hello/) — testbed app, continues as experimental playground
+- `chaquopy-silo-hello` — internal testbed app where Compose + Chaquopy + RNS / LXMF integration was first validated; continues as an experimental bench (not currently public)
 - [Reticulum](https://reticulum.network) — upstream networking stack (we depend on it; we don't fork it)
 - [LXMF](https://github.com/markqvist/LXMF) — upstream message format
 - [GrapheneOS](https://grapheneos.org) — recommended (but optional) sovereign-comms-grade Android distribution; AugerLink runs on stock Android and degrades the posture indicators gracefully
