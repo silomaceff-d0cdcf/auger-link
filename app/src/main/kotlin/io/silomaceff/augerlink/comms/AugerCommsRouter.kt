@@ -41,7 +41,22 @@ object AugerCommsRouter {
      * Safe to call from any coroutine context; runs the actual work on
      * Dispatchers.IO.
      */
-    suspend fun init(context: Context): Result<String> = withContext(Dispatchers.IO) {
+    /**
+     * Boot the Reticulum router and LXMF identity. Returns the local
+     * destination hash on success.
+     *
+     * @param tcpTargetsCsv optional comma-separated list of "host:port"
+     *   entries, each becoming a TCPClientInterface alongside AutoInterface.
+     *   Empty (default) for AutoInterface-only — fine on platforms where
+     *   userspace IPv6 multicast works, but currently EPERM'd on Android
+     *   even with MulticastLock held. Settings UI for entering these
+     *   targets lands in a later microcommit; for now the value is
+     *   threaded through so future callers don't need a signature change.
+     */
+    suspend fun init(
+        context: Context,
+        tcpTargetsCsv: String = "",
+    ): Result<String> = withContext(Dispatchers.IO) {
         ensureMulticastLockHeld(context.applicationContext)
         ensurePythonStarted(context.applicationContext)
 
@@ -49,9 +64,9 @@ object AugerCommsRouter {
         val module = py.getModule(MODULE)
         val filesDir = context.filesDir.absolutePath
 
-        Log.i(TAG, "Calling $MODULE.init(filesDir=$filesDir)")
+        Log.i(TAG, "Calling $MODULE.init(filesDir=$filesDir, tcp_targets='$tcpTargetsCsv')")
 
-        val result = module.callAttr("init", filesDir)
+        val result = module.callAttr("init", filesDir, tcpTargetsCsv)
         val ok = result.callAttr("get", "ok").toBoolean()
         if (ok) {
             val dest = result.callAttr("get", "lxmf_dest").toString()

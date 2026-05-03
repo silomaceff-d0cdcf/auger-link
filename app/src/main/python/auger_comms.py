@@ -39,14 +39,18 @@ _local_destination = None
 _autointerface_patched = False
 
 
-# RNS config with AutoInterface enabled. The default Reticulum config also
-# enables AutoInterface but uses socket.if_nametoindex() which Chaquopy's
-# bundled Python doesn't ship (stripped from python-for-android's stdlib).
-# We work around that by monkey-patching AutoInterface.interface_name_to_index
-# to use RNS's own netinfo helper (already a Chaquopy-compatible code path
-# that Reticulum uses on Windows). Patch + config together let AutoInterface
-# bring up wlan0 (or whatever interface Android exposes) for LAN discovery.
-_AUTOIFACE_CONFIG = """\
+# RNS config building blocks. AutoInterface gives us link-local peer
+# discovery on platforms where multicast actually works; TCPClientInterface
+# gives us a known-good unicast path to a configured peer (the testbed's
+# fallback strategy on Android, where the OS sandbox restricts userspace
+# IPv6 multicast egress even with WifiManager.MulticastLock held).
+#
+# When `tcp_targets` is provided to init(), each entry becomes a
+# [[LAN TCP N]] block in the generated config. AutoInterface stays in
+# the config too — harmless when its multicast send is EPERM'd, and a
+# free upgrade path on hosts where multicast does work.
+
+_CONFIG_HEADER = """\
 [reticulum]
 enable_transport = False
 share_instance = Yes
@@ -59,6 +63,49 @@ loglevel = 4
     type = AutoInterface
     enabled = Yes
 """
+
+_TCP_BLOCK_TEMPLATE = """\
+  [[LAN TCP {n}]]
+    type = TCPClientInterface
+    enabled = Yes
+    target_host = {host}
+    target_port = {port}
+"""
+
+
+def _build_config(tcp_targets: list[tuple[str, int]]) -> str:
+    """Compose the RNS config with AutoInterface + zero-or-more TCP targets."""
+    blocks = [
+        _TCP_BLOCK_TEMPLATE.format(n=i, host=host, port=port)
+        for i, (host, port) in enumerate(tcp_targets, start=1)
+    ]
+    return _CONFIG_HEADER + "\n" + "\n".join(blocks)
+
+
+def _parse_targets_csv(csv: str) -> list[tuple[str, int]]:
+    """Parse 'host1:port1,host2:port2' into a list of (host, int port).
+
+    Empty / whitespace-only string → empty list. Malformed entries are
+    skipped with a stderr warning rather than raising — caller should
+    surface the count via the init() return so UI can confirm targets
+    were accepted as configured.
+    """
+    out: list[tuple[str, int]] = []
+    if not csv or not csv.strip():
+        return out
+    for raw in csv.split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        if ":" not in item:
+            print(f"[auger_comms] dropping malformed target {item!r} (no port)", flush=True)
+            continue
+        host, port_str = item.rsplit(":", 1)
+        try:
+            out.append((host.strip(), int(port_str.strip())))
+        except ValueError:
+            print(f"[auger_comms] dropping malformed target {item!r} (bad port)", flush=True)
+    return out
 
 
 def _install_autointerface_patch() -> None:
@@ -101,17 +148,23 @@ def _install_autointerface_patch() -> None:
     print("[auger_comms] installed AutoInterface caller-provides-indexes patch", flush=True)
 
 
-def init(files_dir: str) -> dict:
+def init(files_dir: str, tcp_targets_csv: str = "") -> dict:
     """Initialize Reticulum + LXMF. Idempotent.
 
     Args:
         files_dir: absolute path to the app's private filesystem area
             (Android Application.getFilesDir().getAbsolutePath()).
+        tcp_targets_csv: optional comma-separated list of "host:port"
+            entries to add as TCPClientInterface blocks alongside
+            AutoInterface. Empty string (default) → AutoInterface-only
+            config. The expected user flow is to set this from a
+            Settings screen once we surface that UI.
 
     Returns:
         dict with keys:
             ok (bool): True on success, False on error
             lxmf_dest (str): 32-char hex destination hash (when ok)
+            tcp_targets (int): number of TCP targets accepted into config
             error (str): error message (when not ok)
             note (str): "already initialized" if called twice (when ok)
     """
@@ -124,6 +177,8 @@ def init(files_dir: str) -> dict:
             "note": "already initialized",
         }
 
+    tcp_targets = _parse_targets_csv(tcp_targets_csv)
+
     saved_handler = signal.getsignal(signal.SIGINT)
 
     try:
@@ -134,12 +189,16 @@ def init(files_dir: str) -> dict:
         rns_cfg = files / "rns_config"
         rns_cfg.mkdir(parents=True, exist_ok=True)
 
-        # Always rewrite the config — guarantees we get the AutoInterface
-        # configuration even on subsequent launches (Reticulum's first-run
-        # auto-generated config is otherwise close enough to be confusing).
+        # Always rewrite the config — guarantees we get the desired
+        # interface set even on subsequent launches (the user may have
+        # changed TCP targets in Settings since last run).
         cfg_path = rns_cfg / "config"
-        cfg_path.write_text(_AUTOIFACE_CONFIG)
-        print(f"[auger_comms.init] wrote AutoInterface config to {cfg_path}", flush=True)
+        cfg_path.write_text(_build_config(tcp_targets))
+        print(
+            f"[auger_comms.init] wrote config to {cfg_path} "
+            f"(AutoInterface + {len(tcp_targets)} TCP target(s))",
+            flush=True,
+        )
 
         print(f"[auger_comms.init] RNS.Reticulum(configdir={rns_cfg})", flush=True)
         _rns = RNS.Reticulum(configdir=str(rns_cfg))
@@ -164,8 +223,12 @@ def init(files_dir: str) -> dict:
         _local_destination.announce()
 
         dest_hex = _local_destination.hash.hex()
-        print(f"[auger_comms.init] OK — lxmf_dest={dest_hex}", flush=True)
-        return {"ok": True, "lxmf_dest": dest_hex}
+        print(
+            f"[auger_comms.init] OK — lxmf_dest={dest_hex}, "
+            f"tcp_targets={len(tcp_targets)}",
+            flush=True,
+        )
+        return {"ok": True, "lxmf_dest": dest_hex, "tcp_targets": len(tcp_targets)}
 
     except Exception as e:
         print(f"[auger_comms.init] FAILED: {type(e).__name__}: {e}", flush=True)
