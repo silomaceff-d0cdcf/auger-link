@@ -11,6 +11,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 /**
  * Minimal foreground service that elevates the app's process importance
@@ -29,6 +33,8 @@ import androidx.core.app.NotificationCompat
  */
 class AugerLinkService : Service() {
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -46,10 +52,21 @@ class AugerLinkService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+
+        // Phase 4 step 3c: start the LXMF receiver poll loop on the service
+        // scope. The loop polls Python's inbox and emits each delivered
+        // message to AugerCommsRouter.incomingMessages for UI subscribers.
+        AugerCommsRouter.startReceiverLoop(serviceScope)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
         START_STICKY
+
+    override fun onDestroy() {
+        Log.i(TAG, "AugerLinkService destroyed — cancelling receiver scope")
+        serviceScope.cancel()
+        super.onDestroy()
+    }
 
     private fun buildNotification(): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)

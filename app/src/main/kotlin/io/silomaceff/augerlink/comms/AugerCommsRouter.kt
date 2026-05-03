@@ -5,7 +5,15 @@ import android.net.wifi.WifiManager
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -47,6 +55,51 @@ object AugerCommsRouter {
 
     @Volatile
     private var multicastLock: WifiManager.MulticastLock? = null
+
+    private val _incomingMessages = MutableSharedFlow<IncomingMessage>(
+        replay = 0,
+        extraBufferCapacity = 64,
+    )
+
+    /** Emits each LXMF message delivered by the Python side. */
+    val incomingMessages: SharedFlow<IncomingMessage> = _incomingMessages.asSharedFlow()
+
+    @Volatile
+    private var receiverJob: Job? = null
+
+    /**
+     * Start the receiver poll loop on [scope]. Polls Python's `_inbox`
+     * every [pollIntervalMs] and emits each drained message to
+     * [incomingMessages]. Idempotent — second call returns the existing
+     * job. Cancel the job (or the scope) to stop polling.
+     */
+    @Synchronized
+    fun startReceiverLoop(
+        scope: CoroutineScope,
+        pollIntervalMs: Long = 1500L,
+    ): Job {
+        receiverJob?.let { return it }
+        val job = scope.launch(Dispatchers.IO) {
+            Log.i(TAG, "receiver loop started (interval=${pollIntervalMs}ms)")
+            while (isActive) {
+                try {
+                    val batch = pollIncoming()
+                    if (batch.isNotEmpty()) {
+                        Log.i(TAG, "receiver loop drained ${batch.size} message(s)")
+                        for (msg in batch) {
+                            _incomingMessages.tryEmit(msg)
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "receiver loop poll failed: ${t.message}")
+                }
+                delay(pollIntervalMs)
+            }
+            Log.i(TAG, "receiver loop stopped")
+        }
+        receiverJob = job
+        return job
+    }
 
     /**
      * Boot the Reticulum router and LXMF identity. Returns the local
