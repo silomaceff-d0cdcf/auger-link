@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        Phase 2: Reticulum + LXMF networking. INTERNET is required for
+        AutoInterface to bind a multicast socket and to send / receive
+        LXMF messages. ACCESS_NETWORK_STATE is required for
+        java.net.NetworkInterface enumeration on Android — without it
+        the AutoInterface caller-provides-indexes patch can't resolve
+        wlan0's kernel index and AutoInterface fails to come up.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

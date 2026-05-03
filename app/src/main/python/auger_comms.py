@@ -36,18 +36,17 @@ _rns = None
 _identity = None
 _router = None
 _local_destination = None
+_autointerface_patched = False
 
 
-# Reticulum's default config enables AutoInterface, which calls
-# socket.if_nametoindex(). Chaquopy's bundled Python doesn't ship that symbol
-# (stripped from python-for-android's stdlib for size), so AutoInterface
-# crashes on construction. Until the AutoInterface caller-provides-indexes
-# monkey-patch lands in a later microcommit, we ship a minimal config with
-# NO interfaces — Reticulum still boots, the local Identity + LXMRouter
-# still create cleanly, but there's no transport. Outbound delivery comes
-# online when interfaces are configured (TCP targets and/or patched
-# AutoInterface in subsequent steps).
-_MINIMAL_CONFIG = """\
+# RNS config with AutoInterface enabled. The default Reticulum config also
+# enables AutoInterface but uses socket.if_nametoindex() which Chaquopy's
+# bundled Python doesn't ship (stripped from python-for-android's stdlib).
+# We work around that by monkey-patching AutoInterface.interface_name_to_index
+# to use RNS's own netinfo helper (already a Chaquopy-compatible code path
+# that Reticulum uses on Windows). Patch + config together let AutoInterface
+# bring up wlan0 (or whatever interface Android exposes) for LAN discovery.
+_AUTOIFACE_CONFIG = """\
 [reticulum]
 enable_transport = False
 share_instance = Yes
@@ -56,7 +55,50 @@ share_instance = Yes
 loglevel = 4
 
 [interfaces]
+  [[Default Interface]]
+    type = AutoInterface
+    enabled = Yes
 """
+
+
+def _install_autointerface_patch() -> None:
+    """Replace AutoInterface.interface_name_to_index with a Chaquopy-friendly
+    implementation that uses netinfo instead of socket.if_nametoindex.
+
+    Idempotent — second invocation is a no-op. Must run BEFORE any
+    AutoInterface is constructed (which happens during RNS.Reticulum() init
+    when an [[AutoInterface]] block is present in the config).
+
+    The replacement matches what RNS already does on Windows: query the
+    netinfo helper that ships with RNS (RNS/Interfaces/util/netinfo.py)
+    rather than the stdlib socket function.
+    """
+    global _autointerface_patched
+    if _autointerface_patched:
+        return
+
+    from RNS.Interfaces import AutoInterface as AI_module
+
+    def _patched(self, ifname):
+        # First try RNS's own netinfo helper. On many Android builds this
+        # returns the right index, but for some interfaces (including
+        # wlan0 in some states) bionic's getifaddrs() reports None — see
+        # the per-interface drop discussion in the testbed's probe notes.
+        idx = self.netinfo.interface_names_to_indexes().get(ifname)
+        if idx is not None:
+            return int(idx)
+        # Fallback: ask Java directly. java.net.NetworkInterface.getByName
+        # is the source-of-truth on Android and returns the kernel interface
+        # index even for interfaces bionic chokes on.
+        from java.net import NetworkInterface
+        iface = NetworkInterface.getByName(ifname)
+        if iface is None:
+            raise OSError(f"interface {ifname!r} not found via NetworkInterface.getByName")
+        return int(iface.getIndex())
+
+    AI_module.AutoInterface.interface_name_to_index = _patched
+    _autointerface_patched = True
+    print("[auger_comms] installed AutoInterface caller-provides-indexes patch", flush=True)
 
 
 def init(files_dir: str) -> dict:
@@ -85,16 +127,19 @@ def init(files_dir: str) -> dict:
     saved_handler = signal.getsignal(signal.SIGINT)
 
     try:
+        # Install the AutoInterface patch BEFORE Reticulum() is constructed.
+        _install_autointerface_patch()
+
         files = Path(files_dir)
         rns_cfg = files / "rns_config"
         rns_cfg.mkdir(parents=True, exist_ok=True)
 
-        # Always rewrite the config — guarantees we get the no-interface
+        # Always rewrite the config — guarantees we get the AutoInterface
         # configuration even on subsequent launches (Reticulum's first-run
-        # auto-generated config enables AutoInterface and would crash here).
+        # auto-generated config is otherwise close enough to be confusing).
         cfg_path = rns_cfg / "config"
-        cfg_path.write_text(_MINIMAL_CONFIG)
-        print(f"[auger_comms.init] wrote minimal config to {cfg_path}", flush=True)
+        cfg_path.write_text(_AUTOIFACE_CONFIG)
+        print(f"[auger_comms.init] wrote AutoInterface config to {cfg_path}", flush=True)
 
         print(f"[auger_comms.init] RNS.Reticulum(configdir={rns_cfg})", flush=True)
         _rns = RNS.Reticulum(configdir=str(rns_cfg))
