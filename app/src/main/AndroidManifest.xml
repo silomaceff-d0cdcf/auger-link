@@ -19,6 +19,19 @@
         spams "carrier loss" warnings on every announce attempt.
     -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!--
+        Foreground service permissions: required so AugerLink can run an
+        AugerLinkService while the activity is backgrounded. Without a
+        foreground service, Android filters outbound IPv6 multicast egress
+        for apps in normal-background importance — AutoInterface's announce
+        sendto returns EPERM at ~50% rate. Promoting the app to foreground
+        importance via a persistent service notification lifts the filter.
+        DATA_SYNC is the appropriate foregroundServiceType for the
+        Reticulum router (always-on bidirectional packet exchange).
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -38,6 +51,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Foreground service: lifts Android's background-multicast-egress
+             filter so AutoInterface announces actually transit. Phase 5 of
+             the roadmap will move the Reticulum router lifecycle into here;
+             for now the service exists purely for the importance elevation. -->
+        <service
+            android:name=".comms.AugerLinkService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>

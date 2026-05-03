@@ -10,6 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import io.silomaceff.augerlink.comms.AugerCommsRouter
+import io.silomaceff.augerlink.comms.AugerLinkService
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
@@ -29,6 +30,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Start the foreground service BEFORE Reticulum init: Android filters
+        // outbound IPv6 multicast egress for apps in normal-background
+        // importance, so AutoInterface's announce sendto fails ~50% of the
+        // time without it. The persistent notification puts the app in
+        // foreground importance and lifts the filter.
+        AugerLinkService.start(this)
 
         // Phase 2 step 3: kick off the Reticulum / LXMF init in the
         // background. Result lands as a LogCat line tagged AugerCommsRouter
