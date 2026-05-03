@@ -15,6 +15,35 @@ Where Sideband is the mature flagship of the Reticulum Android ecosystem, AugerL
 - **Sovereign-comms posture indicators** — when running on a verified-boot Android (e.g. GrapheneOS), the app surfaces verified-boot key hash, identity QR, peer-discovery status in-app so users can verify the chain of trust at a glance. On stock Android the app still runs; the posture indicators degrade gracefully to "unverified."
 - **Reproducible build on a Raspberry Pi 500** — toolchain runs on any Linux host (Pi 500, x86_64 Linux, Apple Silicon via Rosetta); install target is any Android 10+ device (sideload via `adb install` or unknown-sources)
 
+## Sovereign-comms posture: what the indicators are, and why GrapheneOS
+
+A **posture indicator** is a UI element that surfaces the device's actual security and configuration state to the user instead of hiding it. Most apps and operating systems hide posture; AugerLink argues that posture should be first-class visible because users running sovereign-comms need to know they can trust the device they're using.
+
+Phase 5 will surface, in-app:
+
+- **Verified-boot key hash** — a short fingerprint of the public key the phone's bootloader is enforcing at boot. You can match this against a known-good published hash; tampering becomes visible.
+- **Boot state** — `ro.boot.verifiedbootstate`: GREEN (locked + OEM-signed), ORANGE (unlocked, no verification), YELLOW (locked + custom-keyed, e.g. GrapheneOS), RED (tamper detected).
+- **Identity QR** — your LXMF destination as a scannable QR for in-person peer verification (out-of-band trust establishment).
+- **Peer-discovery status** — which mesh / radio / local interfaces are up and which peers are visible right now.
+
+The indicators don't enforce a posture — they surface it. The user (and any peer they hand the phone to) can judge trustworthiness from the visible state.
+
+### Why we recommend GrapheneOS over stock Google Pixel
+
+Concrete, not religious:
+
+1. **Bootloader key ownership.** Stock Pixel ships with the bootloader locked against Google's signing key — you trust Google not to be coerced (national-security letter with gag) or supply-chain compromised. GrapheneOS locks the bootloader against its own published key, fingerprint shown at every boot, matchable against the published value. You can verify the device is running the OS you think it's running.
+
+2. **No Google services in a privileged position.** Stock Pixel ships Google Mobile Services, Pixel telemetry, and Google account integration as first-class system components. GrapheneOS sandboxes Google Play Services into a normal user profile (or omits them entirely). Removing Google's privileged position eliminates an attack surface AND a legal-compulsion surface.
+
+3. **Hardening above the AOSP baseline.** Hardened malloc, kernel exploit mitigations beyond stock, per-app NETWORK and SENSORS permission toggles (apps must explicitly request network access; granular sensor control), Storage Scopes instead of all-or-nothing storage permissions. Empirically more resistant to remote exploit chains.
+
+4. **Update transparency.** GrapheneOS ports Pixel security patches plus its own; the project is small-team with publicly auditable source. You can read the patches that protect you.
+
+**What stock Pixel still has.** Identical Titan M2 hardware-backed security (this is a Pixel hardware feature, not an OS-specific one). Easier setup for non-technical users. Full Play Store and unsandboxed Google services if you want them.
+
+**AugerLink works on stock Android.** The posture indicator will read "Google-signed boot" instead of "GrapheneOS-signed boot." Both are real cryptographic guarantees; the GrapheneOS one is verifiable against a published key (you can match the fingerprint), the Google one is "the key Google uses" with no public audit possible. For users whose threat model includes large-vendor coercion or supply-chain compromise, the GrapheneOS posture is preferred. For users whose threat model is "I just want comms that don't depend on a tower," stock Android is fine — and AugerLink will run identically with reduced posture certainty.
+
 ## Why a separate app
 
 AugerLink was extracted from a working testbed (`chaquopy-silo-hello`) where we validated that Compose + Kotlin + Chaquopy embedded Python + RNS/LXMF can ship a real Android app on top of the Reticulum stack. The testbed continues to exist as an experimental playground; AugerLink is the curated product where validated patterns get redesigned for actual users — farmers, off-grid communities, mesh-radio enthusiasts, anyone who wants comms that don't depend on a tower.
