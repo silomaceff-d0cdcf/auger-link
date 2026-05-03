@@ -27,6 +27,8 @@ Architecture notes:
 from __future__ import annotations
 
 import signal
+import threading
+from collections import deque
 from pathlib import Path
 
 import RNS
@@ -37,6 +39,13 @@ _identity = None
 _router = None
 _local_destination = None
 _autointerface_patched = False
+
+# Inbox for messages delivered by LXMRouter. The delivery callback runs on
+# RNS's dispatch thread; Kotlin polls get_incoming() to drain and surface
+# them to the UI. Bounded so a flood of inbound traffic can't OOM the app
+# if the UI poller is slow.
+_inbox: deque = deque(maxlen=200)
+_inbox_lock = threading.Lock()
 
 
 # RNS config building blocks. AutoInterface gives us link-local peer
@@ -148,6 +157,61 @@ def _install_autointerface_patch() -> None:
     print("[auger_comms] installed AutoInterface caller-provides-indexes patch", flush=True)
 
 
+def _on_lxm_delivered(message) -> None:
+    """LXMRouter delivery callback. Runs on RNS's dispatch thread.
+
+    Must NOT raise — uncaught exceptions break RNS's dispatch loop and
+    silently kill all subsequent inbound deliveries. The whole body is
+    wrapped in a broad except so the worst case is a logged warning, not
+    a dispatch-thread death.
+
+    Snapshot dict format (what Kotlin sees):
+      source_hash:     hex string (16 bytes), sender's LXMF dest hash
+      title:           UTF-8 string (may be empty)
+      content:         UTF-8 string (the message body)
+      timestamp:       float seconds since epoch (sender-claimed)
+      signature_valid: bool — RNS's signature verification result
+    """
+    try:
+        snapshot = {
+            "source_hash": message.source_hash.hex() if getattr(message, "source_hash", None) else "",
+            "title": (message.title_as_string() or "").strip(),
+            "content": (message.content_as_string() or "").strip(),
+            "timestamp": float(message.timestamp) if getattr(message, "timestamp", None) else 0.0,
+            "signature_valid": bool(getattr(message, "signature_validated", False)),
+        }
+    except Exception as e:
+        # Don't let a malformed message kill the dispatch thread.
+        snapshot = {
+            "source_hash": "",
+            "title": "",
+            "content": "",
+            "timestamp": 0.0,
+            "signature_valid": False,
+            "_error": f"snapshot failed: {type(e).__name__}: {e}",
+        }
+
+    with _inbox_lock:
+        _inbox.append(snapshot)
+    print(
+        f"[auger_comms] inbound queued — content_len={len(snapshot.get('content', ''))} "
+        f"sig_ok={snapshot.get('signature_valid', False)}",
+        flush=True,
+    )
+
+
+def get_incoming() -> list:
+    """Drain and return queued inbound messages. Kotlin polls this.
+
+    Each call returns messages received since the last call. Empty list
+    if no new messages.
+    """
+    with _inbox_lock:
+        out = list(_inbox)
+        _inbox.clear()
+    return out
+
+
 def init(files_dir: str, tcp_targets_csv: str = "") -> dict:
     """Initialize Reticulum + LXMF. Idempotent.
 
@@ -217,6 +281,7 @@ def init(files_dir: str, tcp_targets_csv: str = "") -> dict:
         storage.mkdir(parents=True, exist_ok=True)
         print(f"[auger_comms.init] LXMRouter(storagepath={storage})", flush=True)
         _router = LXMF.LXMRouter(identity=_identity, storagepath=str(storage))
+        _router.register_delivery_callback(_on_lxm_delivered)
 
         _local_destination = _router.register_delivery_identity(
             _identity, display_name="AugerLink"
