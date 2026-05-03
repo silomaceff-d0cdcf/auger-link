@@ -11,9 +11,9 @@ AugerLink is a native Android messaging app that runs over [Reticulum](https://r
 Where Sideband is the mature flagship of the Reticulum Android ecosystem, AugerLink is a sister app with a different posture:
 
 - **Farmer-and-field aesthetic** — dark warm UI tuned for outdoor / dawn / dusk readability, NOT cold blue-tech minimalism
-- **Curated feature surface** — voice messaging via wake-phrase, multi-contact CRUD, reliable background reception, sovereign verifiable boot posture
-- **Sovereign-comms posture indicators** — visible verified-boot key hash, identity QR, peer-discovery status, all surfaced in-app so users can verify the chain of trust at a glance
-- **Reproducible build on a Raspberry Pi 500** — anyone with a Pi + GrapheneOS-capable Pixel can build and ship the same APK
+- **Curated feature surface** — voice messaging via wake-phrase, multi-contact CRUD, reliable background reception, sovereign-comms posture indicators
+- **Sovereign-comms posture indicators** — when running on a verified-boot Android (e.g. GrapheneOS), the app surfaces verified-boot key hash, identity QR, peer-discovery status in-app so users can verify the chain of trust at a glance. On stock Android the app still runs; the posture indicators degrade gracefully to "unverified."
+- **Reproducible build on a Raspberry Pi 500** — toolchain runs on any Linux host (Pi 500, x86_64 Linux, Apple Silicon via Rosetta); install target is any Android 10+ device (sideload via `adb install` or unknown-sources)
 
 ## Why a separate app
 
@@ -39,22 +39,32 @@ Color palette extracted from the concept art is in [`design/palette.md`](design/
 
 Copyright 2026 Craig Versek and AugerLink contributors.
 
-## Build
+## Build & Install
 
-`BUILD.md` lands in Phase 7. For now:
+**Build host** — any Linux box with the Android SDK + JDK 17 + Gradle wrapper. The repo has been validated on a Raspberry Pi 500 (ARM64 Linux); see [`BUILD.md`](BUILD.md) for the QEMU_LD_PREFIX workaround needed when running x86_64 AAPT2 on an ARM64 host. x86_64 Linux is the smoothest path; Apple Silicon works via Rosetta 2.
 
 ```
-# Prerequisites: gradle 8.11+, openjdk-17-jdk, Android SDK + NDK,
-# qemu-user-static + libc6-amd64-cross + QEMU_LD_PREFIX for ARM64 hosts
-gradle :app:assembleDebug
+# Prerequisites: openjdk-17-jdk-headless, Android SDK + build-tools,
+# the Gradle wrapper handles the rest
+./gradlew :app:assembleDebug
+# APK lands at app/build/outputs/apk/debug/app-debug.apk
 ```
+
+**Install target** — any Android 10+ device (API 29+). Sideload via:
+
+```
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+# or transfer the APK and install via Android's "install from unknown sources"
+```
+
+The app runs on stock Android. GrapheneOS / verified-boot Android is *recommended* for the strongest sovereign-comms posture (the in-app posture indicators are most informative there) but not required.
 
 ## Sister projects
 
 - [`chaquopy-silo-hello`](../chaquopy-silo-hello/) — testbed app, continues as experimental playground
 - [Reticulum](https://reticulum.network) — upstream networking stack (we depend on it; we don't fork it)
 - [LXMF](https://github.com/markqvist/LXMF) — upstream message format
-- [GrapheneOS](https://grapheneos.org) — recommended sovereign-comms-grade Android distribution for AugerLink deployment
+- [GrapheneOS](https://grapheneos.org) — recommended (but optional) sovereign-comms-grade Android distribution; AugerLink runs on stock Android and degrades the posture indicators gracefully
 
 ---
 
