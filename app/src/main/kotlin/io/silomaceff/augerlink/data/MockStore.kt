@@ -52,7 +52,7 @@ object MockStore {
         ),
         Contact(
             id = "c5",
-            displayName = "Dorn — Coordinator",
+            displayName = "Sam — Coordinator",
             destinationHash = "c0ffee0102030405060708090a0b0c0d",
             role = "alliance coordinator",
             isOnline = false,
