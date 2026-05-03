@@ -236,3 +236,72 @@ def init(files_dir: str, tcp_targets_csv: str = "") -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
     finally:
         signal.signal(signal.SIGINT, saved_handler)
+
+
+def send_message(dest_hash_hex: str, content: str, title: str = "") -> dict:
+    """Send an LXMF text message to a destination identified by hex hash.
+
+    Args:
+        dest_hash_hex: 32-char hex destination hash of the recipient's
+            LXMF delivery identity.
+        content: message body (UTF-8 string).
+        title: optional message title (LXMF supports a separate title
+            field; default empty).
+
+    Returns:
+        dict with keys:
+            ok (bool): True if outbound was queued for delivery
+            lxm_hash (str): hex hash of the LXMF message (when ok)
+            error (str): error message (when not ok)
+
+    Notes:
+        - "ok=True" means LXMRouter accepted the outbound for delivery,
+          NOT that the recipient has received it. Delivery is async and
+          surfaces via the receive-callback wiring (next microcommit).
+        - If the destination's path is not known to RNS yet, this returns
+          ok=False with a "path not known" error and triggers a path
+          request in the background. Caller should retry in a few seconds.
+    """
+    if _router is None or _identity is None or _local_destination is None:
+        return {"ok": False, "error": "router not initialized — call init() first"}
+
+    try:
+        dest_bytes = bytes.fromhex(dest_hash_hex.strip().lower())
+    except Exception as e:
+        return {"ok": False, "error": f"bad dest hash: {e}"}
+
+    try:
+        dest_identity = RNS.Identity.recall(dest_bytes)
+        if dest_identity is None:
+            RNS.Transport.request_path(dest_bytes)
+            return {"ok": False, "error": "path not known yet — retry in a few seconds"}
+
+        dest = RNS.Destination(
+            dest_identity,
+            RNS.Destination.OUT,
+            RNS.Destination.SINGLE,
+            "lxmf",
+            "delivery",
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"destination resolve failed: {e}"}
+
+    try:
+        lxm = LXMF.LXMessage(
+            destination=dest,
+            source=_local_destination,
+            content=content,
+            title=title,
+            desired_method=LXMF.LXMessage.DIRECT,
+        )
+        _router.handle_outbound(lxm)
+    except Exception as e:
+        return {"ok": False, "error": f"handle_outbound failed: {e}"}
+
+    lxm_hash = lxm.hash.hex() if hasattr(lxm, "hash") else None
+    # Don't log dest hash or content — both are identifying. Length only.
+    print(
+        f"[auger_comms.send_message] queued — len={len(content)} lxm_hash_present={lxm_hash is not None}",
+        flush=True,
+    )
+    return {"ok": True, "lxm_hash": lxm_hash}
