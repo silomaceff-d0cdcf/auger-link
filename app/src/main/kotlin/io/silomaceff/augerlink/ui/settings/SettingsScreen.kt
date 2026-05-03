@@ -1,33 +1,118 @@
 package io.silomaceff.augerlink.ui.settings
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import io.silomaceff.augerlink.ui.PaletteSamplerScreen
-import io.silomaceff.augerlink.ui.theme.PaletteLocation
-import io.silomaceff.augerlink.ui.theme.PaletteMode
-import io.silomaceff.augerlink.ui.theme.PaletteVariant
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 
 /**
- * Settings tab — currently re-uses the Phase 1 [PaletteSamplerScreen] as
- * its full body so the palette sampler + dashboard remains accessible from
- * the running app (now nested as Settings rather than the entire app).
+ * Settings tab — top-level hub with sub-screen entries.
  *
- * Phase 6 splits this into discrete sub-screens (Theme, Identity, Build
- * info, etc.). The sampler will graduate to a `Theme` settings detail
- * page reachable from this screen.
+ * Phase 4 step 1 introduces this hub pattern: each settings category
+ * (Network, Theme, future Identity / Build info) is its own destination
+ * reachable from the hub. Replaces the Phase 1 "settings tab IS the
+ * palette sampler" inline shape.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    mode: PaletteMode,
-    resolvedVariant: PaletteVariant,
-    location: PaletteLocation,
-    onModeChange: (PaletteMode) -> Unit,
+    onOpenNetwork: () -> Unit,
+    onOpenTheme: () -> Unit,
 ) {
-    PaletteSamplerScreen(
-        mode = mode,
-        resolvedVariant = resolvedVariant,
-        location = location,
-        onModeChange = onModeChange,
-    )
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Settings") }) },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            SettingsCategoryRow(
+                icon = Icons.Filled.Wifi,
+                title = "Network",
+                subtitle = "TCP peer targets, multicast posture",
+                onClick = onOpenNetwork,
+            )
+            HorizontalDivider()
+            SettingsCategoryRow(
+                icon = Icons.Filled.Palette,
+                title = "Theme",
+                subtitle = "Day / Night palette, sun-flip preview",
+                onClick = onOpenTheme,
+            )
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategoryRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }

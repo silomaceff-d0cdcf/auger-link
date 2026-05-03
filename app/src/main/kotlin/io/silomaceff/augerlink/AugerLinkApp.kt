@@ -22,10 +22,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.silomaceff.augerlink.ui.PaletteSamplerScreen
 import io.silomaceff.augerlink.ui.chats.ChatScreen
 import io.silomaceff.augerlink.ui.chats.ConversationListScreen
 import io.silomaceff.augerlink.ui.contacts.ContactDetailScreen
 import io.silomaceff.augerlink.ui.contacts.ContactListScreen
+import io.silomaceff.augerlink.ui.settings.NetworkSettingsScreen
 import io.silomaceff.augerlink.ui.settings.SettingsScreen
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
@@ -38,6 +40,8 @@ private object Routes {
     const val ContactList = "contacts"
     const val ContactDetail = "contacts/{contactId}"
     const val Settings = "settings"
+    const val SettingsNetwork = "settings/network"
+    const val SettingsTheme = "settings/theme"
 
     fun chat(convId: String) = "chats/$convId"
     fun contactDetail(contactId: String) = "contacts/$contactId"
@@ -117,6 +121,15 @@ fun AugerLinkApp(
             }
             composable(Routes.Settings) {
                 SettingsScreen(
+                    onOpenNetwork = { navController.navigate(Routes.SettingsNetwork) },
+                    onOpenTheme = { navController.navigate(Routes.SettingsTheme) },
+                )
+            }
+            composable(Routes.SettingsNetwork) {
+                NetworkSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SettingsTheme) {
+                PaletteSamplerScreen(
                     mode = paletteMode,
                     resolvedVariant = resolvedVariant,
                     location = paletteLocation,
