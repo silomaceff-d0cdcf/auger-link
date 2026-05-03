@@ -82,6 +82,13 @@ object AugerCommsRouter {
         val job = scope.launch(Dispatchers.IO) {
             Log.i(TAG, "receiver loop started (interval=${pollIntervalMs}ms)")
             while (isActive) {
+                if (!Python.isStarted()) {
+                    // Service onCreate runs before MainActivity has a chance to
+                    // call init(). Skip until Python is up rather than logging
+                    // a misleading "poll failed" warning.
+                    delay(pollIntervalMs)
+                    continue
+                }
                 try {
                     val batch = pollIncoming()
                     if (batch.isNotEmpty()) {
