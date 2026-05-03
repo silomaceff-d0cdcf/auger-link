@@ -41,12 +41,22 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.silomaceff.augerlink.util.SunCalc
+import io.silomaceff.augerlink.ui.theme.SUNSET_LEAD_MINUTES
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.time.Duration
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import io.silomaceff.augerlink.ui.theme.AugerLinkColorsDay
 import io.silomaceff.augerlink.ui.theme.AugerLinkColorsNight
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceMedium
@@ -54,7 +64,10 @@ import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.theme.AugerLinkPaletteTokens
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.LocalAugerLinkTokens
+import io.silomaceff.augerlink.ui.theme.PaletteLocation
+import io.silomaceff.augerlink.ui.theme.PaletteMode
 import io.silomaceff.augerlink.ui.theme.PaletteVariant
+import io.silomaceff.augerlink.ui.theme.describeAutoState
 
 /**
  * Palette Sampler — the Phase 1 skeleton's first screen.
@@ -91,14 +104,20 @@ private val TOKENS: List<TokenSwatch> = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaletteSamplerScreen(
-    variant: PaletteVariant,
-    onVariantChange: (PaletteVariant) -> Unit,
+    mode: PaletteMode,
+    resolvedVariant: PaletteVariant,
+    location: PaletteLocation,
+    onModeChange: (PaletteMode) -> Unit,
 ) {
     val tokens = LocalAugerLinkTokens.current
+    val titleSuffix = when (mode) {
+        PaletteMode.Auto -> "Auto (${resolvedVariant.displayName})"
+        PaletteMode.Day, PaletteMode.Night -> mode.displayName
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AugerLink Palette · ${variant.displayName}") },
+                title = { Text("AugerLink · $titleSuffix") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -122,7 +141,8 @@ fun PaletteSamplerScreen(
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { VariantToggle(variant, onVariantChange) }
+            item { ModeToggle(mode, onModeChange) }
+            item { AutoDashboard(mode, resolvedVariant, location) }
 
             item { SectionHeader("Tokens") }
             items(TOKENS) { TokenRow(it, tokens) }
@@ -140,16 +160,16 @@ fun PaletteSamplerScreen(
             item { HashShowcase() }
 
             item { Spacer(Modifier.height(24.dp)) }
-            item { Footer(variant) }
+            item { Footer(mode, resolvedVariant) }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VariantToggle(
-    variant: PaletteVariant,
-    onVariantChange: (PaletteVariant) -> Unit,
+private fun ModeToggle(
+    mode: PaletteMode,
+    onModeChange: (PaletteMode) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -158,19 +178,162 @@ private fun VariantToggle(
         horizontalArrangement = Arrangement.Center,
     ) {
         SingleChoiceSegmentedButtonRow {
-            PaletteVariant.entries.forEachIndexed { index, v ->
+            PaletteMode.entries.forEachIndexed { index, m ->
                 SegmentedButton(
-                    selected = (v == variant),
-                    onClick = { onVariantChange(v) },
+                    selected = (m == mode),
+                    onClick = { onModeChange(m) },
                     shape = SegmentedButtonDefaults.itemShape(
                         index = index,
-                        count = PaletteVariant.entries.size,
+                        count = PaletteMode.entries.size,
                     ),
                 ) {
-                    Text(v.displayName)
+                    Text(m.displayName)
                 }
             }
         }
+    }
+}
+
+/**
+ * Dashboard panel: date · clock · lat/lon · sunrise · sunset · flip-at · resolved variant.
+ *
+ * Visible in all modes (Auto / Day / Night) for transparency — shows WHY the
+ * current variant is what it is. Clock + computed flip time tick once per
+ * minute via produceState.
+ */
+@Composable
+private fun AutoDashboard(
+    mode: PaletteMode,
+    resolvedVariant: PaletteVariant,
+    location: PaletteLocation,
+) {
+    val now by produceState(
+        initialValue = ZonedDateTime.now(location.zoneId),
+    ) {
+        while (isActive) {
+            value = ZonedDateTime.now(location.zoneId)
+            delay(60_000L)
+        }
+    }
+    val today = now.toLocalDate()
+    val tomorrow = today.plusDays(1)
+    val sunToday: SunCalc.SunTimes? = remember(today, location) {
+        SunCalc.sunriseSunset(today, location.latitudeDeg, location.longitudeDeg, location.zoneId)
+    }
+    val sunTomorrow: SunCalc.SunTimes? = remember(tomorrow, location) {
+        SunCalc.sunriseSunset(tomorrow, location.latitudeDeg, location.longitudeDeg, location.zoneId)
+    }
+
+    val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+    val dateFmt = DateTimeFormatter.ofPattern("EEE  MMM d  yyyy")
+    val nowTime = now.toLocalTime()
+    val sunsetLead = SUNSET_LEAD_MINUTES
+
+    val pastSunsetToday: Boolean = sunToday?.let { nowTime >= it.sunset } ?: false
+    val pastFlipToday: Boolean = sunToday?.let {
+        nowTime >= it.sunset.minus(Duration.ofMinutes(sunsetLead))
+    } ?: false
+    val nextSunriseLabel = if (pastSunsetToday) "Sunrise (tomorrow)" else "Sunrise"
+    val nextSunriseTime = if (pastSunsetToday) sunTomorrow?.sunrise else sunToday?.sunrise
+    val nextSunsetLabel = if (pastSunsetToday) "Sunset (tomorrow)" else "Sunset"
+    val nextSunsetTime = if (pastSunsetToday) sunTomorrow?.sunset else sunToday?.sunset
+    val flipLabel: String
+    val flipValue: String?
+    when {
+        sunToday == null -> { flipLabel = "Flip"; flipValue = "polar — no rise/set today" }
+        !pastFlipToday -> {
+            val flipAt = sunToday.sunset.minus(Duration.ofMinutes(sunsetLead))
+            flipLabel = "Night flip at"
+            flipValue = "${flipAt.format(timeFmt)}  (sunset − ${sunsetLead}m)"
+        }
+        else -> {
+            val nextDay = sunTomorrow?.sunrise
+            flipLabel = "Day flip at"
+            flipValue = if (nextDay != null) "${nextDay.format(timeFmt)}  (tomorrow's sunrise)"
+                        else "tomorrow's sunrise"
+        }
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Top row: date · clock
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = now.format(dateFmt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = now.format(timeFmt),
+                    style = AugerLinkMonospaceMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            // lat/lon
+            DashRow(
+                label = "Location",
+                value = "%.3f°N  %.3f°%s  %s".format(
+                    location.latitudeDeg,
+                    kotlin.math.abs(location.longitudeDeg),
+                    if (location.longitudeDeg >= 0) "E" else "W",
+                    location.zoneId.id,
+                ),
+            )
+            if (nextSunriseTime != null) {
+                DashRow(label = nextSunriseLabel, value = nextSunriseTime.format(timeFmt))
+            }
+            if (nextSunsetTime != null) {
+                DashRow(label = nextSunsetLabel, value = nextSunsetTime.format(timeFmt))
+            }
+            if (flipValue != null) {
+                DashRow(label = flipLabel, value = flipValue)
+            }
+            // Resolved variant + mode
+            DashRow(
+                label = "Mode → variant",
+                value = "${mode.displayName} → ${resolvedVariant.displayName}",
+                valueColor = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = "Phase 1 location is hardcoded; Phase 6 makes it user-configurable.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashRow(label: String, value: String, valueColor: Color? = null) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = AugerLinkMonospaceMedium,
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -399,7 +562,7 @@ private fun HashShowcase() {
 }
 
 @Composable
-private fun Footer(variant: PaletteVariant) {
+private fun Footer(mode: PaletteMode, resolvedVariant: PaletteVariant) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,7 +571,7 @@ private fun Footer(variant: PaletteVariant) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "AugerLink 0.1.0-phase1 — palette sampler · ${variant.displayName}",
+            text = "AugerLink 0.1.0-phase1 — palette sampler · ${mode.displayName} → ${resolvedVariant.displayName}",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -420,18 +583,28 @@ private fun Footer(variant: PaletteVariant) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF1A1410, heightDp = 1600, name = "Night-shift")
+@Preview(showBackground = true, backgroundColor = 0xFF1A1410, heightDp = 1800, name = "Night-shift")
 @Composable
 private fun PaletteSamplerNightPreview() {
     AugerLinkTheme(variant = PaletteVariant.Night) {
-        PaletteSamplerScreen(variant = PaletteVariant.Night, onVariantChange = {})
+        PaletteSamplerScreen(
+            mode = PaletteMode.Night,
+            resolvedVariant = PaletteVariant.Night,
+            location = PaletteLocation.Default,
+            onModeChange = {},
+        )
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF15181B, heightDp = 1600, name = "Day-shift")
+@Preview(showBackground = true, backgroundColor = 0xFF15181B, heightDp = 1800, name = "Day-shift")
 @Composable
 private fun PaletteSamplerDayPreview() {
     AugerLinkTheme(variant = PaletteVariant.Day) {
-        PaletteSamplerScreen(variant = PaletteVariant.Day, onVariantChange = {})
+        PaletteSamplerScreen(
+            mode = PaletteMode.Day,
+            resolvedVariant = PaletteVariant.Day,
+            location = PaletteLocation.Default,
+            onModeChange = {},
+        )
     }
 }
