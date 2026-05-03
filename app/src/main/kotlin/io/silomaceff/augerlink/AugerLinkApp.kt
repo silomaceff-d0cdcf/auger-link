@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import io.silomaceff.augerlink.ui.PaletteSamplerScreen
 import io.silomaceff.augerlink.ui.chats.ChatScreen
 import io.silomaceff.augerlink.ui.chats.ConversationListScreen
+import io.silomaceff.augerlink.ui.contacts.AddContactScreen
 import io.silomaceff.augerlink.ui.contacts.ContactDetailScreen
 import io.silomaceff.augerlink.ui.contacts.ContactListScreen
 import io.silomaceff.augerlink.ui.settings.NetworkSettingsScreen
@@ -39,6 +40,7 @@ private object Routes {
     const val Chat = "chats/{convId}"
     const val ContactList = "contacts"
     const val ContactDetail = "contacts/{contactId}"
+    const val AddContact = "contacts/add"
     const val Settings = "settings"
     const val SettingsNetwork = "settings/network"
     const val SettingsTheme = "settings/theme"
@@ -101,7 +103,13 @@ fun AugerLinkApp(
             composable(Routes.ContactList) {
                 ContactListScreen(
                     onOpenContact = { navController.navigate(Routes.contactDetail(it)) },
-                    onAddContact = { /* Phase 4: paste destination hash */ },
+                    onAddContact = { navController.navigate(Routes.AddContact) },
+                )
+            }
+            composable(Routes.AddContact) {
+                AddContactScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaved = { navController.popBackStack() },
                 )
             }
             composable(Routes.ContactDetail) { backStackEntry ->
