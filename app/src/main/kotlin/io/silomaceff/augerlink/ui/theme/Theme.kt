@@ -4,46 +4,60 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 
-/**
- * AugerLink Material 3 dark color scheme. Reference: design/palette.md.
- * WCAG verification: design/wcag_verified.md (10/10 pairs pass AA).
- */
-private val AugerLinkDarkColorScheme = darkColorScheme(
-    primary              = AugerLinkColors.DuskAmber,
-    onPrimary            = AugerLinkColors.Cream,        // 4.60:1 on DuskAmber ✅
-    primaryContainer     = AugerLinkColors.GlowOrange,
-    onPrimaryContainer   = AugerLinkColors.BarnDark,     // 5.79:1 on GlowOrange ✅ (cream would fail AA)
-    secondary            = AugerLinkColors.Gold,
-    onSecondary          = AugerLinkColors.BarnDark,
-    secondaryContainer   = AugerLinkColors.NightTeal,
-    onSecondaryContainer = AugerLinkColors.Cream,
-    background           = AugerLinkColors.BarnDark,
-    onBackground         = AugerLinkColors.Cream,        // 14.89:1 ✅
-    surface              = AugerLinkColors.Charcoal,
-    onSurface            = AugerLinkColors.Cream,        // 15.75:1 ✅
-    surfaceVariant       = AugerLinkColors.NightTeal,
-    onSurfaceVariant     = AugerLinkColors.CreamMuted,
-    error                = AugerLinkColors.ErrorWarm,
-    onError              = AugerLinkColors.Cream,
-    outline              = AugerLinkColors.Divider,
+/** Selectable palette variant. Default is Night (harvest-warm). Day is cool-mute. */
+enum class PaletteVariant(val displayName: String) {
+    Night("Night-shift"),
+    Day("Day-shift"),
+}
+
+private fun colorSchemeFor(tokens: AugerLinkPaletteTokens) = darkColorScheme(
+    primary              = tokens.primary,
+    onPrimary            = tokens.onPrimary,
+    primaryContainer     = tokens.primaryContainer,
+    onPrimaryContainer   = tokens.onPrimaryContainer,
+    secondary            = tokens.secondary,
+    onSecondary          = tokens.background,
+    secondaryContainer   = tokens.surfaceVariant,
+    onSecondaryContainer = tokens.onBackground,
+    background           = tokens.background,
+    onBackground         = tokens.onBackground,
+    surface              = tokens.surface,
+    onSurface            = tokens.onBackground,
+    surfaceVariant       = tokens.surfaceVariant,
+    onSurfaceVariant     = tokens.onSurfaceVariant,
+    error                = tokens.error,
+    onError              = tokens.onBackground,
+    outline              = tokens.divider,
 )
 
+/** Composition-local so any composable can read the active palette tokens
+ *  without threading them through every parameter. Defaults to Night.
+ */
+val LocalAugerLinkTokens = staticCompositionLocalOf<AugerLinkPaletteTokens> { AugerLinkColorsNight }
+
 /**
- * AugerLink theme — dark only, warm-amber palette per concept art.
+ * AugerLink theme — dark only, two palette variants.
  *
- * The `darkTheme` parameter is accepted for API symmetry but ignored — v1
- * is dark-only. Phase 6 (identity polish) may add an opt-in light variant
- * if user research surfaces demand.
+ * @param variant select Night (harvest) or Day (cool-mute). Default Night.
+ * @param darkTheme accepted for API symmetry but ignored — v1 is dark-only.
  */
 @Composable
 fun AugerLinkTheme(
+    variant: PaletteVariant = PaletteVariant.Night,
     @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = AugerLinkDarkColorScheme,
-        typography = AugerLinkTypography,
-        content = content,
-    )
+    val tokens: AugerLinkPaletteTokens = when (variant) {
+        PaletteVariant.Night -> AugerLinkColorsNight
+        PaletteVariant.Day -> AugerLinkColorsDay
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalAugerLinkTokens provides tokens) {
+        MaterialTheme(
+            colorScheme = colorSchemeFor(tokens),
+            typography = AugerLinkTypography,
+            content = content,
+        )
+    }
 }

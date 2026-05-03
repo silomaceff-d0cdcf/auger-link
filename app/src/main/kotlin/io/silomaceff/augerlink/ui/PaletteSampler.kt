@@ -32,6 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,51 +47,58 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.silomaceff.augerlink.ui.theme.AugerLinkColors
+import io.silomaceff.augerlink.ui.theme.AugerLinkColorsDay
+import io.silomaceff.augerlink.ui.theme.AugerLinkColorsNight
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceMedium
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
+import io.silomaceff.augerlink.ui.theme.AugerLinkPaletteTokens
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
+import io.silomaceff.augerlink.ui.theme.LocalAugerLinkTokens
+import io.silomaceff.augerlink.ui.theme.PaletteVariant
 
 /**
  * Palette Sampler — the Phase 1 skeleton's first screen.
  *
- * This screen IS the palette specification rendered. Side-load the APK + open
- * the app + you can eyeball every named color token, every button state,
- * every Material 3 component as it will look in the real app, on the real
- * device, in real ambient light.
+ * Renders every brand token in real Material 3 components on real device
+ * hardware. A SegmentedButton toggle at the top switches between the
+ * Night-shift (harvest-warm) and Day-shift (cool-mute) palette variants
+ * for live A/B comparison.
  *
- * Acts as the visual regression test: when palette tokens change, this screen
- * shows the diff at a glance.
+ * Acts as the visual regression test: when palette tokens change, this
+ * screen shows the diff at a glance.
  */
 
 private data class TokenSwatch(
     val name: String,
-    val hex: String,
-    val color: Color,
     val role: String,
+    val pick: (AugerLinkPaletteTokens) -> Color,
 )
 
-private val PALETTE_TOKENS: List<TokenSwatch> = listOf(
-    TokenSwatch("dusk-amber",   "#9C5519", AugerLinkColors.DuskAmber,    "primary — top bar, FAB, primary buttons"),
-    TokenSwatch("glow-orange",  "#D97826", AugerLinkColors.GlowOrange,   "primaryContainer — outgoing bubbles, highlights"),
-    TokenSwatch("gold",         "#FFC065", AugerLinkColors.Gold,         "secondary — active indicators, notification dots"),
-    TokenSwatch("cream",        "#F5E6D3", AugerLinkColors.Cream,        "onBackground / onSurface — body text"),
-    TokenSwatch("cream-muted",  "#C8B8A0", AugerLinkColors.CreamMuted,   "onSurfaceVariant — secondary text"),
-    TokenSwatch("barn-dark",    "#1A1410", AugerLinkColors.BarnDark,     "background — app canvas"),
-    TokenSwatch("charcoal",     "#0F0E0C", AugerLinkColors.Charcoal,     "surface — cards, sheets, incoming bubbles"),
-    TokenSwatch("night-teal",   "#2A3040", AugerLinkColors.NightTeal,    "surfaceVariant — separators, tinted accents"),
-    TokenSwatch("divider",      "#2E2A26", AugerLinkColors.Divider,      "outline — section dividers"),
-    TokenSwatch("error",        "#E53E2C", AugerLinkColors.ErrorWarm,    "error — destructive actions"),
-    TokenSwatch("success",      "#7FA756", AugerLinkColors.SuccessOlive, "success — connected, delivered, verified"),
+private val TOKENS: List<TokenSwatch> = listOf(
+    TokenSwatch("primary",            "top bar, FAB, primary buttons")        { it.primary },
+    TokenSwatch("primaryContainer",   "outgoing bubbles, highlights")          { it.primaryContainer },
+    TokenSwatch("secondary",          "active indicators, notification dots")  { it.secondary },
+    TokenSwatch("onBackground",       "body text")                             { it.onBackground },
+    TokenSwatch("onSurfaceVariant",   "secondary text")                        { it.onSurfaceVariant },
+    TokenSwatch("background",         "app canvas")                            { it.background },
+    TokenSwatch("surface",            "cards, sheets, incoming bubbles")       { it.surface },
+    TokenSwatch("surfaceVariant",     "separators, tinted accents")            { it.surfaceVariant },
+    TokenSwatch("divider",            "outline — section dividers")            { it.divider },
+    TokenSwatch("error",              "destructive actions")                   { it.error },
+    TokenSwatch("success",            "connected, delivered, verified")        { it.success },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaletteSamplerScreen() {
+fun PaletteSamplerScreen(
+    variant: PaletteVariant,
+    onVariantChange: (PaletteVariant) -> Unit,
+) {
+    val tokens = LocalAugerLinkTokens.current
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AugerLink Palette") },
+                title = { Text("AugerLink Palette · ${variant.displayName}") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -112,8 +122,10 @@ fun PaletteSamplerScreen() {
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            item { VariantToggle(variant, onVariantChange) }
+
             item { SectionHeader("Tokens") }
-            items(PALETTE_TOKENS) { TokenRow(it) }
+            items(TOKENS) { TokenRow(it, tokens) }
 
             item { SectionHeader("Buttons") }
             item { ButtonShowcase() }
@@ -122,13 +134,42 @@ fun PaletteSamplerScreen() {
             item { BubbleShowcase() }
 
             item { SectionHeader("Status indicators") }
-            item { StatusShowcase() }
+            item { StatusShowcase(tokens) }
 
             item { SectionHeader("Hash display (monospace)") }
             item { HashShowcase() }
 
             item { Spacer(Modifier.height(24.dp)) }
-            item { Footer() }
+            item { Footer(variant) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VariantToggle(
+    variant: PaletteVariant,
+    onVariantChange: (PaletteVariant) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        SingleChoiceSegmentedButtonRow {
+            PaletteVariant.entries.forEachIndexed { index, v ->
+                SegmentedButton(
+                    selected = (v == variant),
+                    onClick = { onVariantChange(v) },
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = PaletteVariant.entries.size,
+                    ),
+                ) {
+                    Text(v.displayName)
+                }
+            }
         }
     }
 }
@@ -150,8 +191,17 @@ private fun SectionHeader(title: String) {
     }
 }
 
+private fun Color.toHexString(): String {
+    val argb = this.value.toLong().toULong().toLong() shr 32
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
+    return "#%02X%02X%02X".format(r, g, b)
+}
+
 @Composable
-private fun TokenRow(t: TokenSwatch) {
+private fun TokenRow(t: TokenSwatch, tokens: AugerLinkPaletteTokens) {
+    val swatch = t.pick(tokens)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -161,7 +211,7 @@ private fun TokenRow(t: TokenSwatch) {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(t.color, RoundedCornerShape(8.dp))
+                .background(swatch, RoundedCornerShape(8.dp))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
         )
         Spacer(Modifier.width(16.dp))
@@ -174,7 +224,7 @@ private fun TokenRow(t: TokenSwatch) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = t.hex,
+                    text = swatch.toHexString(),
                     style = AugerLinkMonospaceMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -201,7 +251,14 @@ private fun ButtonShowcase() {
             Spacer(Modifier.width(8.dp))
             Text("Send (filled / primary)")
         }
-        FilledTonalButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+        FilledTonalButton(
+            onClick = {},
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        ) {
             Text("Tonal (primary container)")
         }
         OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
@@ -231,7 +288,6 @@ private fun BubbleShowcase() {
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Incoming — surface bg + onSurface text
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
@@ -250,7 +306,6 @@ private fun BubbleShowcase() {
                 )
             }
         }
-        // Outgoing — primaryContainer bg + onPrimaryContainer text (BARN-DARK on glow-orange — verified)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
@@ -273,15 +328,15 @@ private fun BubbleShowcase() {
 }
 
 @Composable
-private fun StatusShowcase() {
+private fun StatusShowcase(tokens: AugerLinkPaletteTokens) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        StatusRow(Icons.Filled.CheckCircle, AugerLinkColors.SuccessOlive, "Reticulum interface UP — 3 peers visible")
-        StatusRow(Icons.Filled.WarningAmber, AugerLinkColors.ErrorWarm,    "Last delivery failed — retrying in 30s")
+        StatusRow(Icons.Filled.CheckCircle, tokens.success,  "Reticulum interface UP — 3 peers visible")
+        StatusRow(Icons.Filled.WarningAmber, tokens.error,   "Last delivery failed — retrying in 30s")
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(vertical = 4.dp),
@@ -289,7 +344,7 @@ private fun StatusShowcase() {
             Box(
                 modifier = Modifier
                     .size(10.dp)
-                    .background(AugerLinkColors.Gold, CircleShape),
+                    .background(tokens.secondary, CircleShape),
             )
             Spacer(Modifier.width(12.dp))
             Text(
@@ -344,7 +399,7 @@ private fun HashShowcase() {
 }
 
 @Composable
-private fun Footer() {
+private fun Footer(variant: PaletteVariant) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -353,7 +408,7 @@ private fun Footer() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "AugerLink 0.1.0-phase1 — palette sampler",
+            text = "AugerLink 0.1.0-phase1 — palette sampler · ${variant.displayName}",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -365,10 +420,18 @@ private fun Footer() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF1A1410, heightDp = 1400)
+@Preview(showBackground = true, backgroundColor = 0xFF1A1410, heightDp = 1600, name = "Night-shift")
 @Composable
-private fun PaletteSamplerPreview() {
-    AugerLinkTheme {
-        PaletteSamplerScreen()
+private fun PaletteSamplerNightPreview() {
+    AugerLinkTheme(variant = PaletteVariant.Night) {
+        PaletteSamplerScreen(variant = PaletteVariant.Night, onVariantChange = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF15181B, heightDp = 1600, name = "Day-shift")
+@Composable
+private fun PaletteSamplerDayPreview() {
+    AugerLinkTheme(variant = PaletteVariant.Day) {
+        PaletteSamplerScreen(variant = PaletteVariant.Day, onVariantChange = {})
     }
 }
