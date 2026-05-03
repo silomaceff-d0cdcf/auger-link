@@ -28,6 +28,7 @@ import io.silomaceff.augerlink.ui.chats.ConversationListScreen
 import io.silomaceff.augerlink.ui.contacts.AddContactScreen
 import io.silomaceff.augerlink.ui.contacts.ContactDetailScreen
 import io.silomaceff.augerlink.ui.contacts.ContactListScreen
+import io.silomaceff.augerlink.ui.contacts.UserContactChatScreen
 import io.silomaceff.augerlink.ui.settings.NetworkSettingsScreen
 import io.silomaceff.augerlink.ui.settings.SettingsScreen
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
@@ -41,12 +42,14 @@ private object Routes {
     const val ContactList = "contacts"
     const val ContactDetail = "contacts/{contactId}"
     const val AddContact = "contacts/add"
+    const val UserContactChat = "contacts/user/{destHash}"
     const val Settings = "settings"
     const val SettingsNetwork = "settings/network"
     const val SettingsTheme = "settings/theme"
 
     fun chat(convId: String) = "chats/$convId"
     fun contactDetail(contactId: String) = "contacts/$contactId"
+    fun userContactChat(destHash: String) = "contacts/user/$destHash"
 }
 
 private data class TabSpec(
@@ -104,12 +107,22 @@ fun AugerLinkApp(
                 ContactListScreen(
                     onOpenContact = { navController.navigate(Routes.contactDetail(it)) },
                     onAddContact = { navController.navigate(Routes.AddContact) },
+                    onOpenUserContact = { hash ->
+                        navController.navigate(Routes.userContactChat(hash))
+                    },
                 )
             }
             composable(Routes.AddContact) {
                 AddContactScreen(
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
+                )
+            }
+            composable(Routes.UserContactChat) { backStackEntry ->
+                val destHash = backStackEntry.arguments?.getString("destHash").orEmpty()
+                UserContactChatScreen(
+                    destinationHashHex = destHash,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(Routes.ContactDetail) { backStackEntry ->
