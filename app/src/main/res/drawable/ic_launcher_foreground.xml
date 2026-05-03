@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 1 placeholder for the AugerLink launcher mark.
+  Real vector lands when design/icon-master.svg is finalized — see design/icon-spec.md.
+  Geometry for the placeholder:
+    - tower (upper-right): vertical pillar, gold cap
+    - phone (lower-left): rounded rectangle, cream
+    - light-arc: curved cream stroke connecting phone-cap → tower-cap
+  Adaptive icon viewport is 108×108 with safe content area in inner 66dp circle (~radius 33 about (54,54)).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Tower (silo-as-comms): upper-right pillar -->
+    <path
+        android:pathData="M68,32 L78,32 L78,76 L68,76 Z"
+        android:fillColor="#F5E6D3" />
+    <!-- Tower cap (active glow) -->
+    <path
+        android:pathData="M65,28 L81,28 L81,34 L65,34 Z"
+        android:fillColor="#FFC065" />
+
+    <!-- Phone (gloved hand silhouette implied): lower-left rounded rect -->
+    <path
+        android:pathData="M28,62 m0,4 a4,4 0 0 1 4,-4 l8,0 a4,4 0 0 1 4,4 l0,16 a4,4 0 0 1 -4,4 l-8,0 a4,4 0 0 1 -4,-4 z"
+        android:fillColor="#F5E6D3" />
+    <!-- Phone screen highlight -->
+    <path
+        android:pathData="M30,66 l12,0 l0,10 l-12,0 z"
+        android:fillColor="#1A1410" />
+
+    <!-- Light-arc: sweeping curve from phone-top to tower-cap -->
+    <path
+        android:pathData="M36,60 C 36,28 60,18 73,32"
+        android:strokeColor="#FFC065"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Glow nodes along the arc -->
+    <path
+        android:pathData="M44,42 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#FFC065" />
+    <path
+        android:pathData="M58,30 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#FFC065" />
+</vector>

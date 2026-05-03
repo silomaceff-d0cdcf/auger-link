@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Subset of palette tokens needed at the XML/window-theme level (before
+         Compose paints). Source of truth for all other use is
+         io.silomaceff.augerlink.ui.theme.AugerLinkColors. -->
+    <color name="barn_dark">#1A1410</color>
+    <color name="dusk_amber">#9C5519</color>
+    <color name="cream">#F5E6D3</color>
+</resources>
