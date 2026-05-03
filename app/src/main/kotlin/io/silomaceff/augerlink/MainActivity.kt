@@ -8,20 +8,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import io.silomaceff.augerlink.ui.PaletteSamplerScreen
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
 import io.silomaceff.augerlink.ui.theme.rememberResolvedVariant
 
 /**
- * Phase 1 entry point — palette sampler is the whole app.
+ * Phase 3 entry point — three-tab AugerLink shell (Chats / Contacts / Settings).
  *
- * Default mode is [PaletteMode.Auto]: rendered variant is Day-shift during
- * daylight, flipping to Night-shift 30 minutes before local sunset (NOAA
- * Solar Calculator algorithm in `util/SunCalc.kt`). User can override to
- * fixed Day or fixed Night via the SegmentedButton at the top of the
- * sampler. Override survives rotation via rememberSaveable.
+ * Default palette mode is [PaletteMode.Auto]: rendered variant is Day-shift
+ * during daylight, flipping to Night-shift 30 minutes before local sunset
+ * (NOAA Solar Calculator algorithm in `util/SunCalc.kt`). User can override
+ * to fixed Day or fixed Night via the Settings tab. Override survives
+ * rotation via rememberSaveable.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,11 +31,11 @@ class MainActivity : ComponentActivity() {
             val location = PaletteLocation.Default
             val variant = rememberResolvedVariant(mode = mode, location = location)
             AugerLinkTheme(variant = variant) {
-                PaletteSamplerScreen(
-                    mode = mode,
+                AugerLinkApp(
+                    paletteMode = mode,
                     resolvedVariant = variant,
-                    location = location,
-                    onModeChange = { mode = it },
+                    paletteLocation = location,
+                    onPaletteModeChange = { mode = it },
                 )
             }
         }
