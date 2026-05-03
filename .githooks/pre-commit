@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# AugerLink pre-commit — block private-workspace context leaks in staged additions.
+#
+# Patterns live in .githooks/private-context-patterns (one POSIX-ERE per line).
+# Override (rare; only when leak is intentional + reviewed):
+#   ALLOW_PRIVATE_CONTEXT=1 git commit ...
+
+set -e
+
+if [ "${ALLOW_PRIVATE_CONTEXT:-0}" = "1" ]; then
+    echo "⚠️  pre-commit: ALLOW_PRIVATE_CONTEXT=1 — skipping leak scan"
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PATTERN_FILE="$REPO_ROOT/.githooks/private-context-patterns"
+
+if [ ! -f "$PATTERN_FILE" ]; then
+    echo "⚠️  pre-commit: pattern file missing at $PATTERN_FILE — skipping scan"
+    exit 0
+fi
+
+# Scan ADDED lines only (lines starting with '+', skipping '+++' diff headers),
+# excluding .githooks/ itself so the patterns file + hook scripts don't self-trip.
+# Bracket-class [+] avoids regex-flavor differences between GNU grep and ugrep:
+# `\+` is interpreted as a quantifier in some flavors. The pattern below matches
+# a leading '+' followed by either a non-'+' char or end-of-line — this excludes
+# '+++' diff headers but keeps real added lines.
+HITS=$(git diff --cached --no-color --unified=0 -- ':!.githooks/' \
+       | grep -E '^[+]([^+]|$)' \
+       | grep -nE -f "$PATTERN_FILE" || true)
+
+if [ -n "$HITS" ]; then
+    echo "❌ pre-commit: private-workspace context leak detected in staged additions"
+    echo
+    echo "$HITS"
+    echo
+    echo "These patterns belong only in the agent's private workspace, not in this public repo."
+    echo "Options:"
+    echo "  1. Edit the staged content to remove the leak; \`git add\` again; retry the commit."
+    echo "  2. Override (rare; only when intentional and reviewed):"
+    echo "     ALLOW_PRIVATE_CONTEXT=1 git commit ..."
+    exit 1
+fi
+
+exit 0

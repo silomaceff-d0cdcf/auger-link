@@ -1,0 +1,17 @@
+agent/(public|private|subagents)/
+~/\.claude/
+\.claude/projects/-home-
+gitwork/silomaceff
+s_[a-f0-9]{8}/c_[0-9]+
+p_[a-f0-9]{8}/t_[0-9]{10}
+\bAUTO_MODE\b
+\bMANUAL_MODE\b
+\bDEV_DRV\b
+\bDELEG_DRV\b
+\bJOTEWR\b
+\bCCP\b
+\bMISSION[[:space:]]*#[[:space:]]*[0-9]+
+\btask[[:space:]]*#[[:space:]]*[0-9]+
+\bexperiment[[:space:]]*#[[:space:]]*[0-9]+
+\bidea[[:space:]]*#[[:space:]]*[0-9]+
+\bCycle[[:space:]]+[0-9]+

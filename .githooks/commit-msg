@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# AugerLink commit-msg — block private-workspace context leaks in commit messages.
+#
+# Commit messages become permanent in `git log` after the next push, so this is
+# the highest-leak surface and the hardest to clean up afterward (requires
+# git filter-branch + force-push). Catch leaks before commit lands.
+#
+# Override (rare; only when leak is intentional + reviewed):
+#   ALLOW_PRIVATE_CONTEXT=1 git commit ...
+
+set -e
+
+if [ "${ALLOW_PRIVATE_CONTEXT:-0}" = "1" ]; then
+    echo "⚠️  commit-msg: ALLOW_PRIVATE_CONTEXT=1 — skipping leak scan"
+    exit 0
+fi
+
+MSG_FILE="$1"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PATTERN_FILE="$REPO_ROOT/.githooks/private-context-patterns"
+
+if [ ! -f "$PATTERN_FILE" ]; then
+    echo "⚠️  commit-msg: pattern file missing — skipping scan"
+    exit 0
+fi
+
+# Strip comment lines (#) before scanning; git's commit message editor may
+# include scissor-line comments etc. that are stripped before the commit lands.
+HITS=$(grep -v '^#' "$MSG_FILE" | grep -nE -f "$PATTERN_FILE" || true)
+
+if [ -n "$HITS" ]; then
+    echo "❌ commit-msg: private-workspace context leak detected in commit message"
+    echo
+    echo "$HITS"
+    echo
+    echo "Commit messages become permanent in \`git log\` after push; clean leaks before commit."
+    echo "Options:"
+    echo "  1. Re-run commit with an edited message that drops the leak."
+    echo "  2. Override (rare; only when intentional and reviewed):"
+    echo "     ALLOW_PRIVATE_CONTEXT=1 git commit ..."
+    exit 1
+fi
+
+exit 0
