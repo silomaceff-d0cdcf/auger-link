@@ -56,13 +56,16 @@ android {
     }
 }
 
-// Phase 2: embed CPython 3.11 in the APK. No pip deps yet — this commit just
-// wires up the runtime so the build still produces a runnable APK with the
-// native chaquopy library shipped per arm64-v8a. Code that exercises this
-// arrives in subsequent microcommits.
+// Phase 2: embed CPython 3.11 in the APK + ship Reticulum and LXMF as
+// pip-installed Python packages. Versions match the testbed where these
+// libs were first validated (rns 1.1.4 + lxmf 0.9.4).
 chaquopy {
     defaultConfig {
         version = "3.11"
+        pip {
+            install("rns==1.1.4")
+            install("lxmf==0.9.4")
+        }
     }
 }
 
