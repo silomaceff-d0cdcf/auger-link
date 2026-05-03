@@ -1,6 +1,7 @@
 package io.silomaceff.augerlink.comms
 
 import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -30,6 +31,9 @@ object AugerCommsRouter {
     @Volatile
     private var pythonStarted: Boolean = false
 
+    @Volatile
+    private var multicastLock: WifiManager.MulticastLock? = null
+
     /**
      * Boot the Reticulum router and LXMF identity. Returns the local
      * destination hash on success.
@@ -38,6 +42,7 @@ object AugerCommsRouter {
      * Dispatchers.IO.
      */
     suspend fun init(context: Context): Result<String> = withContext(Dispatchers.IO) {
+        ensureMulticastLockHeld(context.applicationContext)
         ensurePythonStarted(context.applicationContext)
 
         val py = Python.getInstance()
@@ -62,6 +67,28 @@ object AugerCommsRouter {
             Log.e(TAG, "init failed: $error")
             Result.failure(RuntimeException(error))
         }
+    }
+
+    /**
+     * Acquire a Wi-Fi MulticastLock so AutoInterface's link-local IPv6
+     * peer-discovery multicast actually leaves the device. Without this,
+     * Android's userspace-multicast filter drops every send with EPERM
+     * and AutoInterface logs "carrier loss" warnings on every announce.
+     *
+     * The lock is held for the lifetime of the process — Phase 5 service
+     * migration will move acquire/release into the foreground service so
+     * background reception keeps working with predictable lock lifecycle.
+     */
+    @Synchronized
+    private fun ensureMulticastLockHeld(applicationContext: Context) {
+        if (multicastLock?.isHeld == true) return
+        val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val lock = wifi.createMulticastLock("AugerLink.Comms").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+        multicastLock = lock
+        Log.i(TAG, "MulticastLock acquired (held=${lock.isHeld})")
     }
 
     @Synchronized
