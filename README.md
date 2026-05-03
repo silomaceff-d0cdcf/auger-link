@@ -88,6 +88,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 The app runs on stock Android. GrapheneOS / verified-boot Android is *recommended* for the strongest sovereign-comms posture (the in-app posture indicators are most informative there) but not required.
 
+## Contributing
+
+Local git hooks ship in [`.githooks/`](.githooks/) and block private-workspace context from leaking into commits or commit messages. After cloning, enable them once:
+
+```
+git config core.hooksPath .githooks
+```
+
+See [`.githooks/README.md`](.githooks/README.md) for what they catch, the override env var, and rationale for the pattern categories.
+
 ## Sister projects
 
 - `chaquopy-silo-hello` — internal testbed app where Compose + Chaquopy + RNS / LXMF integration was first validated; continues as an experimental bench (not currently public)
