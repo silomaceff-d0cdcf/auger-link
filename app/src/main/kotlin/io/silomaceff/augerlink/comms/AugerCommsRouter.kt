@@ -9,6 +9,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ * Snapshot of an LXMF message delivered by RNS, drained from the Python
+ * `_inbox` deque via [AugerCommsRouter.pollIncoming].
+ */
+data class IncomingMessage(
+    val sourceHashHex: String,
+    val title: String,
+    val content: String,
+    /** Sender-claimed timestamp, seconds since epoch. */
+    val timestamp: Double,
+    /** Whether RNS verified the message signature against the sender's identity. */
+    val signatureValid: Boolean,
+)
+
+/**
  * Bridge from Kotlin to the Python `auger_comms` module that wraps Reticulum
  * + LXMF.
  *
@@ -115,6 +129,36 @@ object AugerCommsRouter {
             Log.w(TAG, "send failed: $error")
             Result.failure(RuntimeException(error))
         }
+    }
+
+    /**
+     * Drain inbound messages delivered since the last poll. Returns an
+     * empty list if no new messages.
+     *
+     * The Python side's `_inbox` deque is bounded at 200 entries; the
+     * caller is expected to poll often enough that overflow doesn't
+     * happen (a 1-2 second cadence is plenty for human-paced traffic).
+     */
+    suspend fun pollIncoming(): List<IncomingMessage> = withContext(Dispatchers.IO) {
+        val py = Python.getInstance()
+        val module = py.getModule(MODULE)
+        val raw = module.callAttr("get_incoming")
+        val size = raw.callAttr("__len__").toInt()
+        if (size == 0) return@withContext emptyList()
+        val out = ArrayList<IncomingMessage>(size)
+        for (i in 0 until size) {
+            val item = raw.callAttr("__getitem__", i)
+            out.add(
+                IncomingMessage(
+                    sourceHashHex = item.callAttr("get", "source_hash")?.toString().orEmpty(),
+                    title = item.callAttr("get", "title")?.toString().orEmpty(),
+                    content = item.callAttr("get", "content")?.toString().orEmpty(),
+                    timestamp = item.callAttr("get", "timestamp")?.toDouble() ?: 0.0,
+                    signatureValid = item.callAttr("get", "signature_valid")?.toBoolean() == true,
+                )
+            )
+        }
+        out
     }
 
     /**
