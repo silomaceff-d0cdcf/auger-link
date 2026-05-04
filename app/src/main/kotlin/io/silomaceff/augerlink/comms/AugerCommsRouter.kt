@@ -231,6 +231,24 @@ object AugerCommsRouter {
      * migration will move acquire/release into the foreground service so
      * background reception keeps working with predictable lock lifecycle.
      */
+    /**
+     * Release the WiFi MulticastLock if held. Called by [AugerLinkService.onDestroy]
+     * for clean shutdown — the process usually dies along with the service so
+     * the kernel reclaims the lock anyway, but cleaning up explicitly avoids
+     * a stale-lock complaint if Android ever stops the FGS without killing
+     * the process.
+     */
+    @Synchronized
+    fun releaseMulticastLockIfHeld() {
+        multicastLock?.let { lock ->
+            if (lock.isHeld) {
+                lock.release()
+                Log.i(TAG, "MulticastLock released")
+            }
+        }
+        multicastLock = null
+    }
+
     @Synchronized
     private fun ensureMulticastLockHeld(applicationContext: Context) {
         if (multicastLock?.isHeld == true) return

@@ -8,15 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.lifecycleScope
-import io.silomaceff.augerlink.comms.AugerCommsRouter
 import io.silomaceff.augerlink.comms.AugerLinkService
-import io.silomaceff.augerlink.data.AugerLinkPrefs
 import io.silomaceff.augerlink.ui.theme.AugerLinkTheme
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
 import io.silomaceff.augerlink.ui.theme.rememberResolvedVariant
-import kotlinx.coroutines.launch
 
 /**
  * Phase 3 entry point — three-tab AugerLink shell (Chats / Contacts / Settings).
@@ -32,21 +28,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Start the foreground service BEFORE Reticulum init: Android filters
-        // outbound IPv6 multicast egress for apps in normal-background
-        // importance, so AutoInterface's announce sendto fails ~50% of the
-        // time without it. The persistent notification puts the app in
-        // foreground importance and lifts the filter.
+        // Phase 5: AugerLinkService now owns the Reticulum router lifecycle.
+        // Starting the service kicks off (1) FGS so multicast egress works,
+        // (2) the receiver poll loop, and (3) Reticulum + LXMF init using
+        // the persisted TCP targets. The router survives Activity death.
         AugerLinkService.start(this)
-
-        // Phase 4 step 1: read the user-configured TCP peer targets from
-        // DataStore Preferences and pass them into the router init. Empty
-        // string means "no TCP peers" (AutoInterface multicast still
-        // discovers local LAN peers on its own).
-        lifecycleScope.launch {
-            val tcpTargets = AugerLinkPrefs.readTcpTargets(this@MainActivity)
-            AugerCommsRouter.init(this@MainActivity, tcpTargets)
-        }
 
         setContent {
             var mode by rememberSaveable { mutableStateOf(PaletteMode.Auto) }

@@ -11,10 +11,12 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.silomaceff.augerlink.data.AugerLinkPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Minimal foreground service that elevates the app's process importance
@@ -57,14 +59,26 @@ class AugerLinkService : Service() {
         // scope. The loop polls Python's inbox and emits each delivered
         // message to AugerCommsRouter.incomingMessages for UI subscribers.
         AugerCommsRouter.startReceiverLoop(serviceScope)
+
+        // Phase 5: own the Reticulum router lifecycle here, not in
+        // MainActivity. The router survives Activity death (user backgrounds
+        // the app, configuration changes, etc.) because the service keeps
+        // running in foreground importance. AugerCommsRouter.init is
+        // idempotent — second calls return the existing destination — so
+        // any leftover MainActivity launch is harmless.
+        serviceScope.launch {
+            val tcpTargets = AugerLinkPrefs.readTcpTargets(this@AugerLinkService)
+            AugerCommsRouter.init(this@AugerLinkService, tcpTargets)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
         START_STICKY
 
     override fun onDestroy() {
-        Log.i(TAG, "AugerLinkService destroyed — cancelling receiver scope")
+        Log.i(TAG, "AugerLinkService destroyed — cancelling receiver scope + releasing lock")
         serviceScope.cancel()
+        AugerCommsRouter.releaseMulticastLockIfHeld()
         super.onDestroy()
     }
 
