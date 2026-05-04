@@ -32,6 +32,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        Phase 5 completion: auto-start the Reticulum router after device
+        reboot so inbound LXMF delivery resumes without requiring the user
+        to open the app first. On Android 11+ the user must launch the app
+        at least once before BOOT_COMPLETED is delivered (OS privacy gate).
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="false"
@@ -53,13 +60,24 @@
         </activity>
 
         <!-- Foreground service: lifts Android's background-multicast-egress
-             filter so AutoInterface announces actually transit. Phase 5 of
-             the roadmap will move the Reticulum router lifecycle into here;
-             for now the service exists purely for the importance elevation. -->
+             filter so AutoInterface announces actually transit. Phase 5
+             migrated the Reticulum router lifecycle into here — service
+             owns init, identity, MulticastLock, and the receive loop. -->
         <service
             android:name=".comms.AugerLinkService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Phase 5 completion: BOOT_COMPLETED auto-starts the service so
+             inbound LXMF delivery resumes after a reboot without requiring
+             the user to open the app first. -->
+        <receiver
+            android:name=".comms.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
