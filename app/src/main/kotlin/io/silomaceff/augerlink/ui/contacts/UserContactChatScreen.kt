@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,31 +41,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.silomaceff.augerlink.comms.AugerCommsRouter
+import io.silomaceff.augerlink.data.AugerLinkDatabase
 import io.silomaceff.augerlink.data.AugerLinkPrefs
+import io.silomaceff.augerlink.data.MessageDirection
+import io.silomaceff.augerlink.data.MessageStatus
+import io.silomaceff.augerlink.data.PersistedMessage
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
 
-private enum class ChatMessageDirection { Outbound, Inbound }
-private enum class ChatMessageStatus { Sending, Delivered, Failed, Received }
-private data class ChatMessageEntry(
-    val id: String,
-    val direction: ChatMessageDirection,
-    val body: String,
-    val sentAt: Instant,
-    val status: ChatMessageStatus,
-)
-
 /**
- * Phase 4 step 4d: dedicated chat UI for a single user-added contact.
+ * Phase 4: dedicated chat UI for a single user-added contact, backed by
+ * the Room `messages` table.
  *
- * Distinct from the MockStore-based [io.silomaceff.augerlink.ui.chats.ChatScreen]
- * — this one drives directly off [AugerLinkPrefs] (for the contact name)
- * and [AugerCommsRouter] (for live send + the incoming-message SharedFlow).
- * No mock data; every message in this screen came from a real LXMF round
- * trip during this app session.
+ * Replaces the c_9 step 4d session-only `mutableStateListOf` — message
+ * history now persists across app restarts. Subscribes to the live DAO
+ * Flow filtered by destination hash; outbound sends insert a Sending row
+ * and update it to Delivered or Failed based on router result; inbound
+ * deliveries insert with the existing Delivered status.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,30 +70,36 @@ fun UserContactChatScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val db = remember { AugerLinkDatabase.get(context) }
+    val dao = remember { db.messageDao() }
+
+    val targetHash = destinationHashHex.lowercase()
     val userContacts by AugerLinkPrefs.contactsFlow(context).collectAsState(initial = emptyList())
     val contact = userContacts.firstOrNull {
-        it.destinationHashHex.equals(destinationHashHex, ignoreCase = true)
+        it.destinationHashHex.equals(targetHash, ignoreCase = true)
     }
     val displayName = contact?.name ?: "Unknown peer"
 
-    val messages = remember(destinationHashHex) { mutableStateListOf<ChatMessageEntry>() }
+    val messages by dao.observeForContact(targetHash).collectAsState(initial = emptyList())
     var draft by remember { mutableStateOf("") }
 
-    val targetHash = destinationHashHex.lowercase()
+    // Subscribe to incoming LXMF deliveries for this contact and persist them.
     LaunchedEffect(targetHash) {
         AugerCommsRouter.incomingMessages
             .filter { it.sourceHashHex.lowercase() == targetHash }
             .collect { incoming ->
-                messages.add(
-                    ChatMessageEntry(
-                        id = "in-${System.currentTimeMillis()}-${messages.size}",
-                        direction = ChatMessageDirection.Inbound,
+                val sentAtMs = if (incoming.timestamp > 0)
+                    (incoming.timestamp * 1000).toLong()
+                else System.currentTimeMillis()
+                dao.insert(
+                    PersistedMessage(
+                        id = "in-$sentAtMs-${incoming.content.hashCode()}",
+                        contactDestHash = targetHash,
+                        direction = MessageDirection.Inbound.name,
                         body = incoming.content,
-                        sentAt = if (incoming.timestamp > 0)
-                            Instant.ofEpochSecond(incoming.timestamp.toLong())
-                        else Instant.now(),
-                        status = ChatMessageStatus.Received,
-                    ),
+                        sentAt = sentAtMs,
+                        status = MessageStatus.Delivered.name,
+                    )
                 )
             }
     }
@@ -140,27 +140,28 @@ fun UserContactChatScreen(
                 onSend = {
                     val body = draft.trim()
                     if (body.isNotEmpty()) {
-                        val pending = ChatMessageEntry(
-                            id = "out-${System.currentTimeMillis()}",
-                            direction = ChatMessageDirection.Outbound,
+                        val nowMs = System.currentTimeMillis()
+                        val pending = PersistedMessage(
+                            id = "out-$nowMs",
+                            contactDestHash = targetHash,
+                            direction = MessageDirection.Outbound.name,
                             body = body,
-                            sentAt = Instant.now(),
-                            status = ChatMessageStatus.Sending,
+                            sentAt = nowMs,
+                            status = MessageStatus.Sending.name,
                         )
-                        messages.add(pending)
                         draft = ""
                         scope.launch {
+                            dao.insert(pending)
                             val result = AugerCommsRouter.send(
                                 destinationHashHex = targetHash,
                                 content = body,
                             )
-                            val idx = messages.indexOfFirst { it.id == pending.id }
-                            if (idx >= 0) {
-                                messages[idx] = pending.copy(
-                                    status = if (result.isSuccess) ChatMessageStatus.Delivered
-                                             else ChatMessageStatus.Failed,
+                            dao.update(
+                                pending.copy(
+                                    status = if (result.isSuccess) MessageStatus.Delivered.name
+                                             else MessageStatus.Failed.name,
                                 )
-                            }
+                            )
                         }
                     }
                 },
@@ -190,15 +191,15 @@ fun UserContactChatScreen(
                     .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(messages) { entry -> Bubble(entry) }
+                items(messages, key = { it.id }) { entry -> Bubble(entry) }
             }
         }
     }
 }
 
 @Composable
-private fun Bubble(entry: ChatMessageEntry) {
-    val isOut = entry.direction == ChatMessageDirection.Outbound
+private fun Bubble(entry: PersistedMessage) {
+    val isOut = entry.direction == MessageDirection.Outbound.name
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isOut) Arrangement.End else Arrangement.Start,
@@ -224,13 +225,13 @@ private fun Bubble(entry: ChatMessageEntry) {
                 )
                 Spacer(Modifier.height(2.dp))
                 val statusLabel = when (entry.status) {
-                    ChatMessageStatus.Sending -> "sending…"
-                    ChatMessageStatus.Delivered -> "queued"
-                    ChatMessageStatus.Failed -> "failed"
-                    ChatMessageStatus.Received -> "received"
+                    MessageStatus.Sending.name -> "sending…"
+                    MessageStatus.Delivered.name -> if (isOut) "queued" else "received"
+                    MessageStatus.Failed.name -> "failed"
+                    else -> entry.status.lowercase()
                 }
                 Text(
-                    text = "${TimeFormat.timeOnly(entry.sentAt)} · $statusLabel",
+                    text = "${TimeFormat.timeOnly(Instant.ofEpochMilli(entry.sentAt))} · $statusLabel",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Normal,
                     color = if (isOut)
