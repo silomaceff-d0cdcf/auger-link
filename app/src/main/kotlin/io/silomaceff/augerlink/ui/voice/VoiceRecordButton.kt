@@ -3,7 +3,8 @@ package io.silomaceff.augerlink.ui.voice
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -77,21 +78,33 @@ fun VoiceRecordButton(
         modifier = modifier
             .size(48.dp)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        if (!controller.hasPermission()) {
-                            pendingPermissionStart = true
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            return@detectTapGestures
+                // Sticky press detection: don't cancel on small finger
+                // movement (which detectTapGestures.tryAwaitRelease was
+                // doing intermittently — Craig observed the green mic
+                // indicator flickering on/off mid-press as the gesture
+                // got swallowed by Compose's drag heuristics).
+                //
+                // awaitEachGesture + manual press-state loop tracks the
+                // physical press until ALL pointers are physically up,
+                // ignoring movement entirely.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    if (!controller.hasPermission()) {
+                        pendingPermissionStart = true
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        return@awaitEachGesture
+                    }
+                    scope.launch { controller.start() }
+                    try {
+                        var pressed = true
+                        while (pressed) {
+                            val event = awaitPointerEvent()
+                            pressed = event.changes.any { it.pressed }
                         }
-                        scope.launch { controller.start() }
-                        try {
-                            tryAwaitRelease()
-                        } finally {
-                            scope.launch { controller.stop() }
-                        }
-                    },
-                )
+                    } finally {
+                        scope.launch { controller.stop() }
+                    }
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
