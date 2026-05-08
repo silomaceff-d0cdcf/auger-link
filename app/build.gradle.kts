@@ -55,9 +55,14 @@ android {
     // Vosk's Recognizer mmap-reads the model files on disk and requires them
     // to remain uncompressed within the APK. Without this list AGP gzips
     // the model assets and Vosk fails to load with "Failed to read model".
+    // 'tree' and 'txt' are added for the lgraph model (the small model
+    // didn't ship those files).
     androidResources {
         noCompress.addAll(
-            listOf("conf", "dubm", "fst", "ie", "int", "mat", "mdl", "stats")
+            listOf(
+                "conf", "dubm", "fst", "ie", "int", "mat", "mdl", "stats",
+                "tree", "txt",
+            )
         )
     }
 }
