@@ -12,7 +12,6 @@ import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.StorageService
-import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -52,8 +51,7 @@ class VoskRecognizer(
      */
     suspend fun init() {
         if (model != null) return
-        val unpackedDir = withContext(Dispatchers.IO) { unpackModel() }
-        val loadedModel = Model(unpackedDir.absolutePath)
+        val loadedModel = withContext(Dispatchers.IO) { unpackModel() }
         model = loadedModel
         recognizer = Recognizer(loadedModel, sampleRateHz.toFloat())
     }
@@ -96,21 +94,25 @@ class VoskRecognizer(
         model = null
     }
 
-    private suspend fun unpackModel(): File =
+    /**
+     * StorageService.unpack copies the model from assets to app private
+     * storage on first call and constructs a usable [Model] pointing at
+     * the actual on-disk path. Subsequent calls skip the copy and return
+     * a fresh Model handle to the cached files.
+     *
+     * Critically, the returned Model points at the path Vosk expects —
+     * we previously constructed our own Model from filesDir which was
+     * the wrong location (StorageService writes to externalFilesDir on
+     * some Android versions and nests the source-asset dirname inside
+     * the target dir).
+     */
+    private suspend fun unpackModel(): Model =
         suspendCancellableCoroutine { cont ->
             StorageService.unpack(
                 context,
                 ASSET_MODEL_DIR,
                 INTERNAL_MODEL_DIR,
-                { unpacked: Model? ->
-                    // Vosk's callback hands back a usable Model, but we want the
-                    // raw directory path so we can construct our own (with the
-                    // sample-rate-aware recognizer). Closing the unpacker's
-                    // model is fine — files are on disk.
-                    runCatching { unpacked?.close() }
-                    val dir = File(context.filesDir, INTERNAL_MODEL_DIR)
-                    cont.resume(dir)
-                },
+                { unpacked: Model -> cont.resume(unpacked) },
                 { err: java.io.IOException ->
                     Log.e(TAG, "Vosk model unpack failed", err)
                     cont.resumeWithException(err)
