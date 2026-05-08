@@ -48,6 +48,7 @@ import io.silomaceff.augerlink.data.MessageStatus
 import io.silomaceff.augerlink.data.PersistedMessage
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
+import io.silomaceff.augerlink.ui.voice.AmbientWakeListener
 import io.silomaceff.augerlink.ui.voice.VoiceRecordButton
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -83,6 +84,17 @@ fun UserContactChatScreen(
 
     val messages by dao.observeForContact(targetHash).collectAsState(initial = emptyList())
     var draft by remember { mutableStateOf("") }
+
+    // Phase 6a-5: ambient "Hey Silo" listener. Default OFF — privacy +
+    // battery argue for explicit opt-in via a Settings toggle (lands as
+    // follow-up). Mic-contention with the long-press path will need an
+    // arbitration layer if both are ever simultaneously enabled.
+    val ambientWakeEnabled = false
+    AmbientWakeListener(
+        enabled = ambientWakeEnabled,
+        onWake = { /* visual cue could land here once UX is decided */ },
+        onCommandTranscript = { transcript -> draft = transcript },
+    )
 
     // Subscribe to incoming LXMF deliveries for this contact and persist them.
     LaunchedEffect(targetHash) {
