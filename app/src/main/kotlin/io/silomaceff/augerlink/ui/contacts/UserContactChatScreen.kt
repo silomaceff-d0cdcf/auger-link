@@ -48,6 +48,7 @@ import io.silomaceff.augerlink.data.MessageStatus
 import io.silomaceff.augerlink.data.PersistedMessage
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
+import io.silomaceff.augerlink.ui.voice.VoiceRecordButton
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -276,7 +277,12 @@ private fun Composer(
                         unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                     ),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(4.dp))
+                VoiceRecordButton(
+                    onPartialTranscript = onDraftChange,
+                    onFinalTranscript = onDraftChange,
+                )
+                Spacer(Modifier.width(4.dp))
                 IconButton(
                     onClick = onSend,
                     enabled = draft.isNotBlank(),

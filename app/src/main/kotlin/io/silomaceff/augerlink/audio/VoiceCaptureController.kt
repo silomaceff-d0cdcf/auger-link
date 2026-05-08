@@ -1,0 +1,91 @@
+package io.silomaceff.augerlink.audio
+
+import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
+/**
+ * High-level state holder that wires [AudioCapture] into [VoskRecognizer]
+ * for the long-press voice-record gesture.
+ *
+ * Single instance per chat composer. Lifecycle is bound to its host
+ * Composable; the caller invokes [release] when the Composable leaves
+ * composition.
+ */
+class VoiceCaptureController(context: Context) {
+
+    private val capture = AudioCapture(context)
+    private val recognizer = VoskRecognizer(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _state = MutableStateFlow(VoiceCaptureState.Idle)
+    val state: StateFlow<VoiceCaptureState> = _state.asStateFlow()
+
+    val partials: Flow<String> = recognizer.partialTranscripts
+    val finals: Flow<String> = recognizer.finalTranscripts
+
+    private var captureJob: Job? = null
+
+    fun hasPermission(): Boolean = capture.hasPermission()
+
+    suspend fun start() {
+        if (_state.value == VoiceCaptureState.Recording) return
+        if (!capture.hasPermission()) return
+        _state.value = VoiceCaptureState.Initializing
+        runCatching { recognizer.init() }.onFailure {
+            Log.e(TAG, "Vosk init failed", it)
+            _state.value = VoiceCaptureState.Error
+            return
+        }
+        runCatching { capture.start() }.onFailure {
+            Log.e(TAG, "AudioCapture start failed", it)
+            _state.value = VoiceCaptureState.Error
+            return
+        }
+        _state.value = VoiceCaptureState.Recording
+        captureJob = scope.launch {
+            capture.frames.collect { frame ->
+                recognizer.feed(frame)
+            }
+        }
+    }
+
+    suspend fun stop() {
+        if (_state.value != VoiceCaptureState.Recording) {
+            _state.value = VoiceCaptureState.Idle
+            return
+        }
+        capture.stop()
+        captureJob?.cancel()
+        captureJob = null
+        recognizer.flushFinal()
+        _state.value = VoiceCaptureState.Idle
+    }
+
+    fun release() {
+        capture.release()
+        recognizer.release()
+        scope.cancel()
+    }
+
+    companion object {
+        private const val TAG = "VoiceCaptureController"
+    }
+}
+
+enum class VoiceCaptureState {
+    Idle,
+    Initializing,
+    Recording,
+    Error,
+}
