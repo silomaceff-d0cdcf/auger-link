@@ -41,7 +41,11 @@ class VoiceCaptureController(context: Context) {
 
     suspend fun start() {
         if (_state.value == VoiceCaptureState.Recording) return
-        if (!capture.hasPermission()) return
+        if (!capture.hasPermission()) {
+            Log.w(TAG, "start: RECORD_AUDIO not granted")
+            return
+        }
+        Log.i(TAG, "start: initializing")
         _state.value = VoiceCaptureState.Initializing
         runCatching { recognizer.init() }.onFailure {
             Log.e(TAG, "Vosk init failed", it)
@@ -54,14 +58,22 @@ class VoiceCaptureController(context: Context) {
             return
         }
         _state.value = VoiceCaptureState.Recording
+        Log.i(TAG, "start: recording")
         captureJob = scope.launch {
+            var frameCount = 0
             capture.frames.collect { frame ->
                 recognizer.feed(frame)
+                frameCount++
+                if (frameCount % 33 == 0) {
+                    Log.d(TAG, "fed $frameCount frames (~${frameCount * 30}ms audio)")
+                }
             }
+            Log.i(TAG, "frame collector exited after $frameCount frames")
         }
     }
 
     suspend fun stop() {
+        Log.i(TAG, "stop: state=${_state.value}")
         if (_state.value != VoiceCaptureState.Recording) {
             _state.value = VoiceCaptureState.Idle
             return
@@ -76,6 +88,7 @@ class VoiceCaptureController(context: Context) {
         captureJob = null
         recognizer.flushFinal()
         _state.value = VoiceCaptureState.Idle
+        Log.i(TAG, "stop: done, back to Idle")
     }
 
     fun release() {

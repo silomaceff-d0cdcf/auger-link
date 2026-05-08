@@ -73,10 +73,16 @@ class VoskRecognizer(
         val end = rec.acceptWaveForm(frame, frame.size)
         if (end) {
             val text = JSONObject(rec.result).optString("text").trim()
-            if (text.isNotEmpty()) _finals.emit(text)
+            if (text.isNotEmpty()) {
+                Log.i(TAG, "FINAL: '$text'")
+                _finals.emit(text)
+            }
         } else {
             val partial = JSONObject(rec.partialResult).optString("partial").trim()
-            if (partial.isNotEmpty()) _partials.emit(partial)
+            if (partial.isNotEmpty()) {
+                Log.d(TAG, "partial: '$partial'")
+                _partials.emit(partial)
+            }
         }
     }
 
@@ -84,6 +90,7 @@ class VoskRecognizer(
     suspend fun flushFinal() {
         val rec = recognizer ?: return
         val text = JSONObject(rec.finalResult).optString("text").trim()
+        Log.i(TAG, "flushFinal: '${text}'")
         if (text.isNotEmpty()) _finals.emit(text)
     }
 

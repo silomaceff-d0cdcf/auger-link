@@ -11,8 +11,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,34 +20,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.silomaceff.augerlink.audio.VoiceCaptureController
 import io.silomaceff.augerlink.audio.VoiceCaptureState
 import kotlinx.coroutines.launch
 
 /**
- * Mic button for the chat composer. Long-press to record a voice
- * utterance; release to stop, transcribe, and pipe the result into the
- * caller's draft text via [onPartialTranscript] / [onFinalTranscript].
+ * Mic button that drives a [VoiceCaptureController] via long-press gesture.
  *
- * Phase 6a-4 scope: this only does record-then-transcribe-into-text-field.
- * Phase 6b will add opus encode + voice attachment send for messages that
- * the user wants to send AS audio rather than as text.
+ * The controller is hoisted to the caller so a sibling composable
+ * ([VoiceRecordingBanner]) can read its state and render a visible
+ * "Listening…" banner during the press. Caller is responsible for
+ * controller lifecycle ([VoiceCaptureController.release] on dispose).
  *
- * Permission flow: tap-and-hold without RECORD_AUDIO triggers the runtime
- * permission request once; the recording does not begin until the
- * permission is granted on the next press.
+ * Long-press flow:
+ *   1. press down → if no RECORD_AUDIO permission, request it; gesture ends.
+ *   2. press down with permission → controller.start(); state turns Recording.
+ *   3. release → controller.stop(); transcript final flushed.
+ *
+ * The first long-press after a fresh install requests RECORD_AUDIO and
+ * does NOT start recording on that gesture (Android's permission dialog
+ * cancels the touch). Subsequent presses begin recording immediately.
  */
 @Composable
 fun VoiceRecordButton(
-    onPartialTranscript: (String) -> Unit,
-    onFinalTranscript: (String) -> Unit,
+    controller: VoiceCaptureController,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val controller = remember { VoiceCaptureController(context) }
     val state by controller.state.collectAsState()
 
     var pendingPermissionStart by remember { mutableStateOf(false) }
@@ -60,16 +58,6 @@ fun VoiceRecordButton(
             scope.launch { controller.start() }
         }
         pendingPermissionStart = false
-    }
-
-    LaunchedEffect(Unit) {
-        controller.partials.collect(onPartialTranscript)
-    }
-    LaunchedEffect(Unit) {
-        controller.finals.collect(onFinalTranscript)
-    }
-    DisposableEffect(Unit) {
-        onDispose { controller.release() }
     }
 
     val tint = when (state) {

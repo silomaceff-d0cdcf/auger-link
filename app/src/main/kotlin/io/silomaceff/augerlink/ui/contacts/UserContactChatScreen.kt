@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,10 +48,12 @@ import io.silomaceff.augerlink.data.MessageDirection
 import io.silomaceff.augerlink.data.MessageStatus
 import io.silomaceff.augerlink.data.PersistedMessage
 import io.silomaceff.augerlink.audio.TextToSpeechEngine
+import io.silomaceff.augerlink.audio.VoiceCaptureController
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
 import io.silomaceff.augerlink.ui.voice.AmbientWakeListener
 import io.silomaceff.augerlink.ui.voice.VoiceRecordButton
+import io.silomaceff.augerlink.ui.voice.VoiceRecordingBanner
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -85,6 +88,20 @@ fun UserContactChatScreen(
 
     val messages by dao.observeForContact(targetHash).collectAsState(initial = emptyList())
     var draft by remember { mutableStateOf("") }
+
+    // Phase 6a voice capture: controller hoisted to screen scope so the
+    // recording banner (above composer) and the mic button (in composer)
+    // can read its state coherently.
+    val voiceController = remember { VoiceCaptureController(context) }
+    LaunchedEffect(voiceController) {
+        voiceController.partials.collect { p -> draft = p }
+    }
+    LaunchedEffect(voiceController) {
+        voiceController.finals.collect { f -> draft = f }
+    }
+    DisposableEffect(voiceController) {
+        onDispose { voiceController.release() }
+    }
 
     // Phase 6a-5: ambient "Hey Silo" listener. Default OFF — privacy +
     // battery argue for explicit opt-in via a Settings toggle (lands as
@@ -159,38 +176,42 @@ fun UserContactChatScreen(
             }
         },
         bottomBar = {
-            Composer(
-                draft = draft,
-                onDraftChange = { draft = it },
-                onSend = {
-                    val body = draft.trim()
-                    if (body.isNotEmpty()) {
-                        val nowMs = System.currentTimeMillis()
-                        val pending = PersistedMessage(
-                            id = "out-$nowMs",
-                            contactDestHash = targetHash,
-                            direction = MessageDirection.Outbound.name,
-                            body = body,
-                            sentAt = nowMs,
-                            status = MessageStatus.Sending.name,
-                        )
-                        draft = ""
-                        scope.launch {
-                            dao.insert(pending)
-                            val result = AugerCommsRouter.send(
-                                destinationHashHex = targetHash,
-                                content = body,
+            Column {
+                VoiceRecordingBanner(controller = voiceController)
+                Composer(
+                    draft = draft,
+                    onDraftChange = { draft = it },
+                    voiceController = voiceController,
+                    onSend = {
+                        val body = draft.trim()
+                        if (body.isNotEmpty()) {
+                            val nowMs = System.currentTimeMillis()
+                            val pending = PersistedMessage(
+                                id = "out-$nowMs",
+                                contactDestHash = targetHash,
+                                direction = MessageDirection.Outbound.name,
+                                body = body,
+                                sentAt = nowMs,
+                                status = MessageStatus.Sending.name,
                             )
-                            dao.update(
-                                pending.copy(
-                                    status = if (result.isSuccess) MessageStatus.Delivered.name
-                                             else MessageStatus.Failed.name,
+                            draft = ""
+                            scope.launch {
+                                dao.insert(pending)
+                                val result = AugerCommsRouter.send(
+                                    destinationHashHex = targetHash,
+                                    content = body,
                                 )
-                            )
+                                dao.update(
+                                    pending.copy(
+                                        status = if (result.isSuccess) MessageStatus.Delivered.name
+                                                 else MessageStatus.Failed.name,
+                                    )
+                                )
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -273,6 +294,7 @@ private fun Bubble(entry: PersistedMessage) {
 private fun Composer(
     draft: String,
     onDraftChange: (String) -> Unit,
+    voiceController: VoiceCaptureController,
     onSend: () -> Unit,
 ) {
     Surface(
@@ -302,10 +324,7 @@ private fun Composer(
                     ),
                 )
                 Spacer(Modifier.width(4.dp))
-                VoiceRecordButton(
-                    onPartialTranscript = onDraftChange,
-                    onFinalTranscript = onDraftChange,
-                )
+                VoiceRecordButton(controller = voiceController)
                 Spacer(Modifier.width(4.dp))
                 IconButton(
                     onClick = onSend,
