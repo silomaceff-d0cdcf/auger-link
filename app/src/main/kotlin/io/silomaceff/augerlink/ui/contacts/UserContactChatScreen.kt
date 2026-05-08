@@ -46,6 +46,7 @@ import io.silomaceff.augerlink.data.AugerLinkPrefs
 import io.silomaceff.augerlink.data.MessageDirection
 import io.silomaceff.augerlink.data.MessageStatus
 import io.silomaceff.augerlink.data.PersistedMessage
+import io.silomaceff.augerlink.audio.TextToSpeechEngine
 import io.silomaceff.augerlink.ui.theme.AugerLinkMonospaceSmall
 import io.silomaceff.augerlink.ui.util.TimeFormat
 import io.silomaceff.augerlink.ui.voice.AmbientWakeListener
@@ -96,6 +97,14 @@ fun UserContactChatScreen(
         onCommandTranscript = { transcript -> draft = transcript },
     )
 
+    // Phase 6c: prime the TTS engine when this screen is first composed so
+    // the first auto-speak doesn't pay the engine-init latency mid-message.
+    LaunchedEffect(Unit) { TextToSpeechEngine.init(context) }
+
+    val autoSpeak by AugerLinkPrefs
+        .autoSpeakInboundFlow(context)
+        .collectAsState(initial = false)
+
     // Subscribe to incoming LXMF deliveries for this contact and persist them.
     LaunchedEffect(targetHash) {
         AugerCommsRouter.incomingMessages
@@ -114,6 +123,9 @@ fun UserContactChatScreen(
                         status = MessageStatus.Delivered.name,
                     )
                 )
+                // Read aloud after persistence — keeps history correct even
+                // if the speak() throws or the engine isn't ready.
+                if (autoSpeak) TextToSpeechEngine.speak(incoming.content)
             }
     }
 
