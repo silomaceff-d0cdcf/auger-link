@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.chaquopy)
     alias(libs.plugins.ksp)
@@ -8,12 +7,12 @@ plugins {
 
 android {
     namespace = "io.silomaceff.augerlink"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.silomaceff.augerlink"
         minSdk = 29              // foreground-service-type matches Phase 1 design substrate
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-phase1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -44,9 +43,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
     }
@@ -55,6 +51,12 @@ android {
             java.srcDirs("src/main/kotlin")
         }
     }
+}
+
+// AGP 9's built-in Kotlin support reads the JVM target from this block,
+// not from a `kotlinOptions { jvmTarget = "17" }` inside `android { }` (removed in AGP 9).
+kotlin {
+    jvmToolchain(17)
 }
 
 // Phase 2: embed CPython 3.11 in the APK + ship Reticulum and LXMF as
