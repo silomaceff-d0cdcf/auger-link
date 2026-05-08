@@ -31,6 +31,7 @@ import io.silomaceff.augerlink.ui.contacts.ContactListScreen
 import io.silomaceff.augerlink.ui.contacts.UserContactChatScreen
 import io.silomaceff.augerlink.ui.settings.NetworkSettingsScreen
 import io.silomaceff.augerlink.ui.settings.SettingsScreen
+import io.silomaceff.augerlink.ui.settings.VoiceSettingsScreen
 import io.silomaceff.augerlink.ui.theme.PaletteLocation
 import io.silomaceff.augerlink.ui.theme.PaletteMode
 import io.silomaceff.augerlink.ui.theme.PaletteVariant
@@ -46,6 +47,7 @@ private object Routes {
     const val Settings = "settings"
     const val SettingsNetwork = "settings/network"
     const val SettingsTheme = "settings/theme"
+    const val SettingsVoice = "settings/voice"
 
     fun chat(convId: String) = "chats/$convId"
     fun contactDetail(contactId: String) = "contacts/$contactId"
@@ -144,6 +146,7 @@ fun AugerLinkApp(
                 SettingsScreen(
                     onOpenNetwork = { navController.navigate(Routes.SettingsNetwork) },
                     onOpenTheme = { navController.navigate(Routes.SettingsTheme) },
+                    onOpenVoice = { navController.navigate(Routes.SettingsVoice) },
                 )
             }
             composable(Routes.SettingsNetwork) {
@@ -156,6 +159,9 @@ fun AugerLinkApp(
                     location = paletteLocation,
                     onModeChange = onPaletteModeChange,
                 )
+            }
+            composable(Routes.SettingsVoice) {
+                VoiceSettingsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

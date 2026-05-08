@@ -33,6 +33,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!--
+        Phase 6a: voice features. RECORD_AUDIO is the runtime permission
+        that gates the mic capture pipeline. FOREGROUND_SERVICE_MICROPHONE
+        lets the always-on AugerLinkService hold the mic for wake-word
+        detection without being throttled in the background — without it,
+        Android 14+ throws ForegroundServiceTypeException when the service
+        starts listening.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!--
         Phase 5 completion: auto-start the Reticulum router after device
         reboot so inbound LXMF delivery resumes without requiring the user
         to open the app first. On Android 11+ the user must launch the app
@@ -63,10 +73,16 @@
              filter so AutoInterface announces actually transit. Phase 5
              migrated the Reticulum router lifecycle into here — service
              owns init, identity, MulticastLock, and the receive loop. -->
+        <!-- foregroundServiceType="dataSync|microphone": dataSync remains the
+             primary justification (Reticulum + LXMF always-on packet
+             exchange); microphone is added for Phase 6a's wake-word listener
+             which the service hosts so it can be active while the activity
+             is backgrounded. Both types are mandatory under Android 14+
+             when the service uses each capability. -->
         <service
             android:name=".comms.AugerLinkService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|microphone" />
 
         <!-- Phase 5 completion: BOOT_COMPLETED auto-starts the service so
              inbound LXMF delivery resumes after a reboot without requiring

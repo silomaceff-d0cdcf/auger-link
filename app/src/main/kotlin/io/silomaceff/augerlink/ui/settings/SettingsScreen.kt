@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     onOpenNetwork: () -> Unit,
     onOpenTheme: () -> Unit,
+    onOpenVoice: () -> Unit,
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Settings") }) },
@@ -64,6 +66,13 @@ fun SettingsScreen(
                 title = "Theme",
                 subtitle = "Day / Night palette, sun-flip preview",
                 onClick = onOpenTheme,
+            )
+            HorizontalDivider()
+            SettingsCategoryRow(
+                icon = Icons.Filled.Mic,
+                title = "Voice",
+                subtitle = "Auto-speak inbound messages, future wake-phrase + voice prefs",
+                onClick = onOpenVoice,
             )
             HorizontalDivider()
         }

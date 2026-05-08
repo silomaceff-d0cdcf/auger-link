@@ -3,6 +3,7 @@ package io.silomaceff.augerlink.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -28,6 +29,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 object AugerLinkPrefs {
     private val KEY_TCP_TARGETS = stringPreferencesKey("tcp_targets_csv")
     private val KEY_CONTACTS = stringPreferencesKey("user_contacts_v1")
+    private val KEY_AUTO_SPEAK_INBOUND = booleanPreferencesKey("auto_speak_inbound")
 
     fun tcpTargetsFlow(context: Context): Flow<String> =
         context.dataStore.data.map { it[KEY_TCP_TARGETS] ?: "" }
@@ -57,6 +59,24 @@ object AugerLinkPrefs {
 
     suspend fun writeContacts(context: Context, contacts: List<UserContact>) {
         context.dataStore.edit { it[KEY_CONTACTS] = encodeContacts(contacts) }
+    }
+
+    /**
+     * Phase 6c: global auto-speak toggle. When true, every inbound LXMF
+     * text message is read aloud via [TextToSpeechEngine] on the chat
+     * screen that owns the conversation. Default false; opt-in via
+     * Settings → Voice.
+     *
+     * Per-contact override + LXMF FIELD_SPEAK_HINT honoring lands later.
+     */
+    fun autoSpeakInboundFlow(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_AUTO_SPEAK_INBOUND] ?: false }
+
+    suspend fun readAutoSpeakInbound(context: Context): Boolean =
+        autoSpeakInboundFlow(context).first()
+
+    suspend fun writeAutoSpeakInbound(context: Context, value: Boolean) {
+        context.dataStore.edit { it[KEY_AUTO_SPEAK_INBOUND] = value }
     }
 
     suspend fun addContact(context: Context, contact: UserContact) {
