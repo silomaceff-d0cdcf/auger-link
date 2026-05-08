@@ -51,6 +51,15 @@ android {
             java.srcDirs("src/main/kotlin")
         }
     }
+
+    // Vosk's Recognizer mmap-reads the model files on disk and requires them
+    // to remain uncompressed within the APK. Without this list AGP gzips
+    // the model assets and Vosk fails to load with "Failed to read model".
+    androidResources {
+        noCompress.addAll(
+            listOf("conf", "dubm", "fst", "ie", "int", "mat", "mdl", "stats")
+        )
+    }
 }
 
 // AGP 9's built-in Kotlin support reads the JVM target from this block,
@@ -87,5 +96,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    // Phase 6a: offline speech-to-text via Vosk (Kaldi). Pulls Kaldi +
+    // OpenFST native libs for arm64-v8a (~5 MB additional APK weight).
+    // The actual STT model is shipped uncompressed in assets/model-en-us.
+    implementation(libs.vosk.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

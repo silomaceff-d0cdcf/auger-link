@@ -10,6 +10,7 @@ chaquopy = "17.0.0"
 datastorePreferences = "1.1.1"
 room = "2.8.4"
 ksp = "2.3.7"
+voskAndroid = "0.3.47"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -27,6 +28,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
