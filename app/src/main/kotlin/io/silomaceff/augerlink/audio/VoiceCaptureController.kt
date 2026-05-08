@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,7 +67,12 @@ class VoiceCaptureController(context: Context) {
             return
         }
         capture.stop()
-        captureJob?.cancel()
+        // Wait for the frame-feed coroutine to finish before invoking
+        // recognizer.flushFinal — Vosk's native decoder is not safe to
+        // call concurrently with acceptWaveForm, and a previous version
+        // crashed in libvosk.so's lattice decoder when stop() raced the
+        // last in-flight feed() call.
+        captureJob?.cancelAndJoin()
         captureJob = null
         recognizer.flushFinal()
         _state.value = VoiceCaptureState.Idle
